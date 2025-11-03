@@ -1,0 +1,212 @@
+# PROJECT OVERVIEW
+
+Build a *Progressive Web App (PWA)* called *Achievement Wallet* — a social web platform for students to capture, verify, and showcase their achievements in a trusted and decentralized way.
+
+Instead of a mobile app, this will be a *responsive PWA* accessible on browsers but installable on any device.  
+It should behave like a *social app* — with a feed, friend connections, and user profiles — but the core focus is *achievement verification and digital portfolio management*.
+
+---
+
+# 🧱 CORE STACK
+
+- *Frontend:* React + TypeScript + Vite
+- *Backend:* Node.js (Express or Next.js API routes)
+- *Blockchain:* Sui Move smart contracts
+- *Wallet:* Slush Wallet integration for login and transaction signing
+- *Database:* Supabase (for off-chain metadata + authentication bridge)
+- *UI Library:* TailwindCSS + shadcn/ui + Framer Motion (animations)
+- *Deployment:* Vercel (Frontend) + Supabase (Backend DB)
+- *PWA Features:* manifest.json + service worker + offline caching
+
+---
+
+# 🎯 CORE FEATURES
+
+### 1️⃣ Achievement Capture & Verification
+Students can upload proofs of achievements in categories such as:
+- Academic  
+- Leadership  
+- Technology  
+- Community Involvement  
+- Sports & Arts (optional)
+
+Each uploaded achievement should include:
+- Image or document upload (certificate or photo)
+- Automatic GPS + timestamp (via browser APIs)
+- Description, tags, and category
+- Status: Pending, Verified, or Rejected
+
+*Verification Process*
+- Organizer or issuer (with verified Slush wallet identity) can digitally verify the proof.
+- Verification creates a *Sui Move on-chain record* of authenticity.
+- The verified achievement is stored as a *non-transferable NFT (soulbound token)* in the student’s Sui wallet.
+
+---
+
+### 2️⃣ Peer Presence Verification (Social-lite System)
+Allows friend-based proof validation when the student’s phone isn’t available.
+
+Example:
+- User A attends a seminar but their phone is dead.  
+- User B takes the proof photo and tags User A.  
+- Both users’ GPS + timestamps are recorded.
+- The system verifies that both were in the same location at the same time.
+
+*Rules:*
+- Tagged user must confirm the tag to claim the achievement.
+- The record will show “Peer Verified by [User B]”.
+- Peer verification is limited to verified friends only.
+
+---
+
+### 3️⃣ Achievement Wallet (Digital Portfolio)
+Each student has a *digital portfolio* showcasing:
+- Certificates and badges  
+- Attendance and verified events  
+- Leadership roles and community service  
+- Skills earned or recognized  
+
+Portfolio can be:
+- *Private* (only visible to the user)
+- *Friends-only*
+- *Public (for employers/schools)*
+
+Each achievement should display:
+- Image, category, date, verification status, issuer, GPS, timestamp
+- Linked on-chain proof hash (Sui transaction ID)
+
+---
+
+### 4️⃣ Points & Rewards System
+- Every verified achievement grants *Skill Points*.
+- Points are stored both off-chain (for UI ranking) and on-chain (Sui).
+- Levels or badges unlock as points accumulate:
+  - Level 1: Initiate
+  - Level 5: Skill Pioneer
+  - Level 10: Excellence Rank
+- Possible integration for future school or partner rewards.
+
+---
+
+# 👥 SOCIAL FEATURES
+
+- Friend system (follow/accept model)
+- Newsfeed showing friends’ verified achievements
+- Comment + reaction support (lightweight social)
+- Optional notifications for:
+  - Friend achievements
+  - Verification approvals
+  - Tag requests
+
+---
+
+# 🧩 LOGIN FLOW (SLUSH WALLET)
+
+1. On app load, show “Connect Slush Wallet” button.  
+2. User authenticates via Slush Wallet → login JWT stored in Supabase.  
+3. If first login:
+   - Create a user profile (wallet address, display name, avatar).  
+   - Optional onboarding form for school or course info.
+
+---
+
+# ⚙️ SYSTEM DESIGN SUMMARY
+
+*Frontend Pages:*
+- / → Landing page (app description + CTA)
+- /feed → Activity feed (friends’ achievements)
+- /profile/:id → User portfolio page
+- /upload → Upload new achievement (photo, category, GPS)
+- /verify → Organizer dashboard to approve submissions
+- /rewards → Skill points and ranks page
+- /settings → Profile, privacy, and wallet settings
+
+*Backend API Routes (Next.js or Express):*
+- /api/achievements → CRUD + verification logic
+- /api/peertag → peer tagging flow
+- /api/user → profile info
+- /api/points → reward tracking
+- /api/auth/slush → login bridge with Slush wallet
+
+---
+
+# 🔐 SUI MOVE INTEGRATION REQUIREMENTS
+
+Create a *Sui Move module* with the following structure:
+
+
+module achievement_wallet::achievement {
+    struct Achievement has key, store {
+    id: UID,
+    owner: address,
+    verifier: address,
+    category: String,
+    proof_hash: vector<u8>,
+    timestamp: u64,
+    gps_data: String,
+    verified: bool
+    }
+    public entry fun mint_achievement(
+        owner: address,
+        category: String,
+        proof_hash: vector<u8>,
+        gps_data: String,
+        ctx: &mut TxContext
+    ) { ... }
+    
+    public entry fun verify_achievement(
+        achievement_id: ID,
+        verifier: address,
+        ctx: &mut TxContext
+    ) { ... }
+
+    
+    Each verified achievement becomes a *soulbound NFT* tied to the student’s wallet address.
+    
+    ---
+    
+    # 🪄 DESIGN STYLE
+    
+    - Minimalist interface with subtle gradients and soft shadows
+    - Card-based layout (rounded-xl, subtle drop shadows)
+    - Color theme: pastel blue & white with accent highlights
+    - Framer Motion for transitions
+    - Mobile-first responsive design (since it’s a PWA)
+    
+    ---
+    
+    # 📱 PWA CONFIGURATION
+    
+    - Generate manifest.json with:
+      - name: Achievement Wallet
+      - short_name: A-Wallet
+      - theme_color: "#1E40AF"
+      - background_color: "#FFFFFF"
+      - display: "standalone"
+      - start_url: "/"
+      - Icon sizes (192x192, 512x512)
+    - Add service worker for offline caching
+    - Add “Install App” button for desktop and mobile browsers
+    
+    ---
+    
+    # 🧠 DEVELOPMENT GOALS
+    
+    - Prioritize clean code and modular architecture
+    - Use TypeScript interfaces for data models
+    - Integrate Sui Move calls through Slush Wallet
+    - Keep verification flow simple but secure
+    - Ensure offline support and fast loading via caching
+    - All components styled cleanly with Tailwind and shadcn/ui
+    
+    ---
+    
+    # 📦 FINAL OUTPUT EXPECTATION
+    
+    Generate the full codebase scaffold including:
+    - React components
+    - PWA setup
+    - Wallet login integration
+    - Achievement upload + verification flow (mock API first)
+    - Dummy UI for Sui Move blockchain verification
+    - Example Achievement card and Feed view

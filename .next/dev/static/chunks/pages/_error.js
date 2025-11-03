@@ -1,0 +1,13 @@
+__turbopack_load_page_chunks__("/_error", [
+  "static/chunks/a2296_next_dist_compiled_434b0bfc._.js",
+  "static/chunks/a2296_next_dist_shared_lib_e96e7ef4._.js",
+  "static/chunks/a2296_next_dist_client_ebbf8ecf._.js",
+  "static/chunks/a2296_next_dist_5aa88ed7._.js",
+  "static/chunks/a2296_next_error_f0b4148f.js",
+  "static/chunks/[next]_entry_page-loader_ts_4a45babf._.js",
+  "static/chunks/a2296_react-dom_d761f6c6._.js",
+  "static/chunks/a2296_965d00ca._.js",
+  "static/chunks/[root-of-the-server]__fcc75c35._.js",
+  "static/chunks/ygg-app_src_pages__error_2da965e7._.js",
+  "static/chunks/turbopack-ygg-app_src_pages__error_a011c52e._.js"
+])

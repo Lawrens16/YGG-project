@@ -1,0 +1,10 @@
+[package]
+name = "achievement_wallet"
+version = "1.0.0"
+
+[addresses]
+achievement_wallet = "0x0"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
+

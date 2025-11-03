@@ -1,0 +1,50 @@
+{
+  "pages": {
+    "/_app": [
+      "static/chunks/a2296_next_dist_compiled_434b0bfc._.js",
+      "static/chunks/a2296_next_dist_shared_lib_4c58c256._.js",
+      "static/chunks/a2296_next_dist_client_ebbf8ecf._.js",
+      "static/chunks/a2296_next_dist_9d6fdd73._.js",
+      "static/chunks/a2296_next_app_d9a9babc.js",
+      "static/chunks/[next]_entry_page-loader_ts_04e80aba._.js",
+      "static/chunks/a2296_react-dom_d761f6c6._.js",
+      "static/chunks/a2296_965d00ca._.js",
+      "static/chunks/[root-of-the-server]__34fb0471._.js",
+      "static/chunks/ygg-app_src_pages__app_2da965e7._.js",
+      "static/chunks/turbopack-ygg-app_src_pages__app_3cf6ffab._.js"
+    ],
+    "/_error": [
+      "static/chunks/a2296_next_dist_compiled_434b0bfc._.js",
+      "static/chunks/a2296_next_dist_shared_lib_e96e7ef4._.js",
+      "static/chunks/a2296_next_dist_client_ebbf8ecf._.js",
+      "static/chunks/a2296_next_dist_5aa88ed7._.js",
+      "static/chunks/a2296_next_error_f0b4148f.js",
+      "static/chunks/[next]_entry_page-loader_ts_4a45babf._.js",
+      "static/chunks/a2296_react-dom_d761f6c6._.js",
+      "static/chunks/a2296_965d00ca._.js",
+      "static/chunks/[root-of-the-server]__fcc75c35._.js",
+      "static/chunks/ygg-app_src_pages__error_2da965e7._.js",
+      "static/chunks/turbopack-ygg-app_src_pages__error_a011c52e._.js"
+    ]
+  },
+  "devFiles": [],
+  "polyfillFiles": [
+    "static/chunks/a2296_next_dist_build_polyfills_polyfill-nomodule.js"
+  ],
+  "lowPriorityFiles": [
+    "static/development/_ssgManifest.js",
+    "static/development/_buildManifest.js"
+  ],
+  "rootMainFiles": [
+    "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_4f156884._.js",
+    "static/chunks/a2296_next_dist_compiled_react-dom_c8d4c99b._.js",
+    "static/chunks/a2296_next_dist_compiled_react-server-dom-turbopack_a48eebce._.js",
+    "static/chunks/a2296_next_dist_compiled_next-devtools_index_03f738d8.js",
+    "static/chunks/a2296_next_dist_compiled_e040c4b1._.js",
+    "static/chunks/a2296_next_dist_client_c66d7698._.js",
+    "static/chunks/a2296_next_dist_5154888f._.js",
+    "static/chunks/a2296_@swc_helpers_cjs_d22c51b2._.js",
+    "static/chunks/ygg-app_a0ff3932._.js",
+    "static/chunks/turbopack-ygg-app_de208bf4._.js"
+  ]
+}
