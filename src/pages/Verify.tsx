@@ -9,9 +9,9 @@ import { AchievementCard } from '@/components/AchievementCard';
 import type { Achievement } from '@/types';
 
 export function Verify() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(true);
 
   useEffect(() => {
     if (user?.is_organizer) {
@@ -20,14 +20,14 @@ export function Verify() {
   }, [user]);
 
   async function loadPendingAchievements() {
-    setLoading(true);
+    setListLoading(true);
     try {
       const data = await getAchievements({ status: 'pending' });
       setPendingAchievements(data as Achievement[]);
     } catch (error) {
       console.error('Error loading pending achievements:', error);
     } finally {
-      setLoading(false);
+      setListLoading(false);
     }
   }
 
@@ -48,6 +48,14 @@ export function Verify() {
   async function handleReject(achievementId: string) {
     // TODO: Implement reject functionality
     console.log('Reject achievement:', achievementId);
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-gray-500">Checking wallet connection...</p>
+      </div>
+    );
   }
 
   if (!user) {
@@ -71,7 +79,7 @@ export function Verify() {
     );
   }
 
-  if (loading) {
+  if (listLoading) {
     return (
       <div className="text-center py-20">
         <p className="text-gray-500">Loading pending achievements...</p>

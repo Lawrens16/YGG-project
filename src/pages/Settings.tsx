@@ -8,8 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
 
 export function Settings() {
-  const { user, updateUser } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { user, updateUser, loading } = useAuth();
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     display_name: user?.display_name || '',
     bio: user?.bio || '',
@@ -17,6 +17,14 @@ export function Settings() {
     course_name: user?.course_name || '',
     privacy_level: user?.privacy_level || 'friends',
   });
+
+  if (loading) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-gray-500">Checking wallet connection...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -28,7 +36,7 @@ export function Settings() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
     try {
       if (!user) return;
       await updateUserProfile(user.id, formData);
@@ -38,7 +46,7 @@ export function Settings() {
       console.error('Error updating profile:', error);
       alert('Failed to update profile. Please try again.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
@@ -125,8 +133,8 @@ export function Settings() {
               </select>
             </div>
 
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Saving...' : 'Save Changes'}
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </form>
         </CardContent>

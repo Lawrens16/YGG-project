@@ -5,7 +5,15 @@ import { Award, Star, TrendingUp, Zap } from 'lucide-react';
 import { getLevelFromPoints } from '@/lib/utils';
 
 export function Rewards() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-gray-500">Checking wallet connection...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

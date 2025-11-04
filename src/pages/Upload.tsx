@@ -19,9 +19,9 @@ const categories = [
 ];
 
 export function Upload() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -63,7 +63,7 @@ export function Upload() {
     e.preventDefault();
     if (!user) return;
 
-    setLoading(true);
+    setSubmitting(true);
     try {
       // TODO: Upload image to Supabase Storage
       const imageUrl = formData.image ? URL.createObjectURL(formData.image) : null;
@@ -85,8 +85,16 @@ export function Upload() {
       console.error('Error creating achievement:', error);
       alert('Failed to create achievement. Please try again.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-gray-500">Checking wallet connection...</p>
+      </div>
+    );
   }
 
   if (!user) {
@@ -197,8 +205,8 @@ export function Upload() {
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Uploading...' : 'Submit Achievement'}
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? 'Uploading...' : 'Submit Achievement'}
             </Button>
           </form>
         </CardContent>

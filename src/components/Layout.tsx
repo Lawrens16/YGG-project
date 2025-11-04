@@ -10,8 +10,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  if (!user) return <>{children}</>;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
@@ -23,14 +21,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
               <span className="font-bold text-xl text-gray-900">Achievement Wallet</span>
             </Link>
-
             <div className="flex items-center space-x-4">
-              <Link to={`/profile/${user.id}`}>
-                <Avatar src={user.avatar_url || undefined} alt={user.display_name || 'User'} />
-              </Link>
-              <Button variant="ghost" size="icon" onClick={disconnect}>
-                <LogOut className="w-5 h-5" />
-              </Button>
+              {user ? (
+                <>
+                  <Link to={`/profile/${user.id}`}>
+                    <Avatar src={user.avatar_url || undefined} alt={user.display_name || 'User'} />
+                  </Link>
+                  <Button variant="ghost" size="icon" onClick={disconnect}>
+                    <LogOut className="w-5 h-5" />
+                  </Button>
+                </>
+              ) : (
+                <Link to="/">
+                  <Button variant="secondary">Get Started</Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -38,11 +43,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Bottom Navigation for Mobile */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 lg:hidden z-50">
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-6 gap-1">
           <NavLink to="/feed" icon={Home} label="Feed" isActive={isActive('/feed')} />
           <NavLink to="/upload" icon={PlusCircle} label="Upload" isActive={isActive('/upload')} />
+          <NavLink to="/verify" icon={Settings} label="Verify" isActive={isActive('/verify')} />
           <NavLink to="/rewards" icon={Award} label="Rewards" isActive={isActive('/rewards')} />
-          <NavLink to={`/profile/${user.id}`} icon={User} label="Profile" isActive={location.pathname.startsWith('/profile')} />
+          <NavLink
+            to={user ? `/profile/${user.id}` : "/"}
+            icon={User}
+            label={user ? "Profile" : "Home"}
+            isActive={user ? location.pathname.startsWith('/profile') : isActive('/')}
+          />
+          <NavLink to="/settings" icon={Settings} label="Settings" isActive={isActive('/settings')} />
         </div>
       </div>
 
