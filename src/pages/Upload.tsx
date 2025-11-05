@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { createAchievement } from '@/lib/api';
+import { createAchievement, verifyAchievement } from '@/lib/api';
+import { getDailyTasks, isTaskMatch } from '@/lib/tasks';
+import { mintCertificate } from '@/lib/sui';
+import exifr from 'exifr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +32,7 @@ export function Upload() {
     image: null as File | null,
   });
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
+  const dailyTasks = getDailyTasks();
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -65,20 +69,82 @@ export function Upload() {
 
     setSubmitting(true);
     try {
-      // TODO: Upload image to Supabase Storage
+      // Basic upload stub - replace with Supabase Storage later
       const imageUrl = formData.image ? URL.createObjectURL(formData.image) : null;
 
-      await createAchievement({
+      // Extract EXIF from image if present
+      let exifDate: Date | null = null;
+      let exifLat: number | null = null;
+      let exifLng: number | null = null;
+      if (formData.image) {
+        try {
+          const exif = await exifr.parse(formData.image as any);
+          if (exif?.DateTimeOriginal) exifDate = new Date(exif.DateTimeOriginal);
+          if (typeof exif?.latitude === 'number') exifLat = exif.latitude;
+          if (typeof exif?.longitude === 'number') exifLng = exif.longitude;
+        } catch {}
+      }
+
+      // Verify against daily tasks and date
+      const match = isTaskMatch(formData.title + ' ' + formData.description, dailyTasks);
+      const isToday = (d: Date | null) => {
+        if (!d) return false;
+        const a = new Date();
+        return d.getUTCFullYear() === a.getUTCFullYear() && d.getUTCMonth() === a.getUTCMonth() && d.getUTCDate() === a.getUTCDate();
+      };
+      const geoOk = (() => {
+        if (exifLat != null && exifLng != null && gps) {
+          const dl = exifLat - gps.lat;
+          const dln = exifLng - gps.lng;
+          const distKm = Math.sqrt(dl * dl + dln * dln) * 111; // rough
+          return distKm < 5; // within ~5km
+        }
+        return true; // if no GPS, don't block
+      })();
+
+      // Compute simple proof hash from file bytes + exif
+      let proofHash = new Uint8Array();
+      if (formData.image) {
+        const buf = await formData.image.arrayBuffer();
+        const encoder = new TextEncoder();
+        const meta = encoder.encode(`${exifDate?.toISOString() || ''}|${exifLat ?? ''},${exifLng ?? ''}`);
+        const concat = new Uint8Array(meta.byteLength + buf.byteLength);
+        concat.set(new Uint8Array(meta.buffer));
+        concat.set(new Uint8Array(buf), meta.byteLength);
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', concat));
+        proofHash = digest;
+      }
+
+      // Helper to encode bytes as hex string (browser-safe)
+      const toHex = (bytes: Uint8Array) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      // Create DB record first as pending
+      const created = await createAchievement({
         user_id: user.id,
         title: formData.title,
         description: formData.description,
-        category: formData.category,
+        category: match?.category || formData.category,
         image_url: imageUrl,
-        gps_latitude: gps?.lat || null,
-        gps_longitude: gps?.lng || null,
+        proof_hash: proofHash.length ? toHex(proofHash) : null,
+        gps_latitude: gps?.lat || exifLat || null,
+        gps_longitude: gps?.lng || exifLng || null,
         timestamp: new Date().toISOString(),
         status: 'pending',
       });
+
+      // If verification succeeds, mint on Sui and mark verified
+      if (match && (isToday(exifDate) || exifDate === null) && geoOk) {
+        const { digest, created: objectId } = await mintCertificate({
+          owner: user.wallet_address,
+          category: match.category,
+          title: match.title,
+          description: formData.description || '',
+          proofHash,
+          gpsData: `${(gps?.lat ?? exifLat) ?? ''},${(gps?.lng ?? exifLng) ?? ''}`,
+        });
+        await verifyAchievement(created.id, user.wallet_address, digest, objectId);
+        // Optionally store object id separately (not in API helper yet)
+      }
 
       navigate('/feed');
     } catch (error) {
