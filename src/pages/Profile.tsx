@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserProfile, getAchievements } from '@/lib/api';
+import { getUserProfile, getAchievements, getFriendshipStatus, sendFriendRequest } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,8 @@ export function Profile() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [friendshipStatus, setFriendshipStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected' | 'blocked'>('none');
+  const [friendshipLoading, setFriendshipLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -33,10 +35,29 @@ export function Profile() {
 
       const achievementsData = await getAchievements({ userId: id });
       setAchievements(achievementsData as Achievement[]);
+
+      if (currentUser && id) {
+        const fs = await getFriendshipStatus(currentUser.id, id);
+        setFriendshipStatus(fs ? (fs.status as any) : 'none');
+      }
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleAddFriend() {
+    if (!currentUser || !profile) return;
+    try {
+      setFriendshipLoading(true);
+      await sendFriendRequest(currentUser.id, profile.id);
+      setFriendshipStatus('pending');
+    } catch (e) {
+      console.error('Failed to send friend request', e);
+      alert('Failed to send friend request.');
+    } finally {
+      setFriendshipLoading(false);
     }
   }
 
@@ -91,10 +112,18 @@ export function Profile() {
               </div>
             </div>
             {!isOwnProfile && (
-              <Button>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Add Friend
-              </Button>
+              friendshipStatus === 'none' ? (
+                <Button onClick={handleAddFriend} disabled={friendshipLoading}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  {friendshipLoading ? 'Sending...' : 'Add Friend'}
+                </Button>
+              ) : friendshipStatus === 'pending' ? (
+                <Badge variant="secondary">Request Pending</Badge>
+              ) : friendshipStatus === 'accepted' ? (
+                <Badge variant="default">Friends</Badge>
+              ) : (
+                <Badge variant="outline">{friendshipStatus}</Badge>
+              )
             )}
           </div>
         </CardContent>

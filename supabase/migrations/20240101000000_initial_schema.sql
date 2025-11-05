@@ -1,8 +1,11 @@
+-- Run this in Supabase SQL Editor
+-- Go to: Dashboard → SQL Editor → New Query
+
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- User Profiles Table
-CREATE TABLE IF NOT EXISTS public.user_profiles (
+CREATE TABLE user_profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   wallet_address TEXT UNIQUE NOT NULL,
   display_name TEXT,
@@ -19,9 +22,9 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 );
 
 -- Achievements Table
-CREATE TABLE IF NOT EXISTS public.achievements (
+CREATE TABLE achievements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   category TEXT NOT NULL CHECK (category IN ('academic', 'leadership', 'technology', 'community', 'sports', 'arts')),
   title TEXT NOT NULL,
   description TEXT,
@@ -41,12 +44,12 @@ CREATE TABLE IF NOT EXISTS public.achievements (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Peer Tags Table (for peer verification)
-CREATE TABLE IF NOT EXISTS public.peer_tags (
+-- Peer Tags Table
+CREATE TABLE peer_tags (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  achievement_id UUID NOT NULL REFERENCES public.achievements(id) ON DELETE CASCADE,
-  tagger_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
-  tagged_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  achievement_id UUID NOT NULL REFERENCES achievements(id) ON DELETE CASCADE,
+  tagger_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+  tagged_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   tagger_gps_latitude DECIMAL(10, 8),
   tagger_gps_longitude DECIMAL(11, 8),
   tagged_gps_latitude DECIMAL(10, 8),
@@ -56,11 +59,11 @@ CREATE TABLE IF NOT EXISTS public.peer_tags (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Friends Table
-CREATE TABLE IF NOT EXISTS public.friendships (
+-- Friendships Table
+CREATE TABLE friendships (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  requester_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
-  addressee_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  requester_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+  addressee_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'blocked')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -69,29 +72,29 @@ CREATE TABLE IF NOT EXISTS public.friendships (
 );
 
 -- Comments Table
-CREATE TABLE IF NOT EXISTS public.comments (
+CREATE TABLE comments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  achievement_id UUID NOT NULL REFERENCES public.achievements(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  achievement_id UUID NOT NULL REFERENCES achievements(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Reactions Table
-CREATE TABLE IF NOT EXISTS public.reactions (
+CREATE TABLE reactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  achievement_id UUID NOT NULL REFERENCES public.achievements(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  achievement_id UUID NOT NULL REFERENCES achievements(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   reaction_type TEXT DEFAULT 'like' CHECK (reaction_type IN ('like', 'celebrate', 'support')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(achievement_id, user_id)
 );
 
 -- Notifications Table
-CREATE TABLE IF NOT EXISTS public.notifications (
+CREATE TABLE notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('friend_request', 'achievement_verified', 'peer_tag', 'comment', 'reaction')),
   reference_id UUID,
   title TEXT NOT NULL,
@@ -100,64 +103,60 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_achievements_user_id ON public.achievements(user_id);
-CREATE INDEX IF NOT EXISTS idx_achievements_status ON public.achievements(status);
-CREATE INDEX IF NOT EXISTS idx_achievements_category ON public.achievements(category);
-CREATE INDEX IF NOT EXISTS idx_peer_tags_tagged_id ON public.peer_tags(tagged_id);
-CREATE INDEX IF NOT EXISTS idx_peer_tags_status ON public.peer_tags(status);
-CREATE INDEX IF NOT EXISTS idx_friendships_requester ON public.friendships(requester_id);
-CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON public.friendships(addressee_id);
-CREATE INDEX IF NOT EXISTS idx_friendships_status ON public.friendships(status);
-CREATE INDEX IF NOT EXISTS idx_comments_achievement_id ON public.comments(achievement_id);
-CREATE INDEX IF NOT EXISTS idx_reactions_achievement_id ON public.reactions(achievement_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_read ON public.notifications(user_id, read);
+-- Create Indexes
+CREATE INDEX idx_achievements_user_id ON achievements(user_id);
+CREATE INDEX idx_achievements_status ON achievements(status);
+CREATE INDEX idx_achievements_category ON achievements(category);
+CREATE INDEX idx_peer_tags_tagged_id ON peer_tags(tagged_id);
+CREATE INDEX idx_friendships_requester ON friendships(requester_id);
+CREATE INDEX idx_friendships_addressee ON friendships(addressee_id);
+CREATE INDEX idx_comments_achievement_id ON comments(achievement_id);
+CREATE INDEX idx_reactions_achievement_id ON reactions(achievement_id);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 
--- Function to update updated_at timestamp
+-- Update timestamp function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Triggers for updated_at
-CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON public.user_profiles
+-- Add triggers
+CREATE TRIGGER update_user_profiles_updated_at 
+  BEFORE UPDATE ON user_profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_achievements_updated_at BEFORE UPDATE ON public.achievements
+CREATE TRIGGER update_achievements_updated_at 
+  BEFORE UPDATE ON achievements
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_friendships_updated_at BEFORE UPDATE ON public.friendships
+CREATE TRIGGER update_friendships_updated_at 
+  BEFORE UPDATE ON friendships
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON public.comments
+CREATE TRIGGER update_comments_updated_at 
+  BEFORE UPDATE ON comments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
--- Row Level Security (RLS) Policies
-ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.peer_tags ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.reactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+-- Enable Row Level Security
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE peer_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- Basic policies (can be expanded based on auth requirements)
-CREATE POLICY "Users can view their own profile" ON public.user_profiles
-  FOR SELECT USING (true);
+-- Create permissive RLS policies for development
+-- NOTE: These are VERY permissive policies for testing!
+-- You should restrict these in production based on your auth setup
 
-CREATE POLICY "Users can update their own profile" ON public.user_profiles
-  FOR UPDATE USING (true);
-
-CREATE POLICY "Anyone can view public achievements" ON public.achievements
-  FOR SELECT USING (true);
-
-CREATE POLICY "Users can insert their own achievements" ON public.achievements
-  FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Users can update their own achievements" ON public.achievements
-  FOR UPDATE USING (true);
-
+CREATE POLICY "Enable all for user_profiles" ON user_profiles FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for achievements" ON achievements FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for peer_tags" ON peer_tags FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for friendships" ON friendships FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for comments" ON comments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for reactions" ON reactions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Enable all for notifications" ON notifications FOR ALL USING (true) WITH CHECK (true);

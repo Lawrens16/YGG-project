@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserProfile } from '@/lib/api';
+import { updateUserProfile, listPendingFriendRequests, acceptFriendRequest, rejectFriendRequest } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
+import type { UserProfile } from '@/types';
 
 export function Settings() {
   const { user, updateUser, loading } = useAuth();
@@ -17,6 +18,27 @@ export function Settings() {
     course_name: user?.course_name || '',
     privacy_level: user?.privacy_level || 'friends',
   });
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      loadRequests();
+    }
+  }, [user]);
+
+  async function loadRequests() {
+    if (!user) return;
+    setLoadingRequests(true);
+    try {
+      const data = await listPendingFriendRequests(user.id);
+      setPendingRequests(data);
+    } catch (e) {
+      console.error('Failed to load friend requests', e);
+    } finally {
+      setLoadingRequests(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -155,6 +177,58 @@ export function Settings() {
               <p className="text-sm text-gray-900">{user.is_organizer ? 'Yes' : 'No'}</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Pending Friend Requests</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingRequests ? (
+            <p className="text-gray-500">Loading...</p>
+          ) : pendingRequests.length === 0 ? (
+            <p className="text-gray-500">No pending requests.</p>
+          ) : (
+            <div className="space-y-3">
+              {pendingRequests.map((req) => (
+                <div key={req.id} className="flex items-center justify-between p-3 border rounded-md">
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      src={(req.requester as UserProfile)?.avatar_url || undefined}
+                      alt={(req.requester as UserProfile)?.display_name || 'User'}
+                      className="w-10 h-10"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">{(req.requester as UserProfile)?.display_name || 'Anonymous'}</p>
+                      <p className="text-xs text-gray-500">sent you a friend request</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        await acceptFriendRequest(req.id);
+                        await loadRequests();
+                      }}
+                    >
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        await rejectFriendRequest(req.id);
+                        await loadRequests();
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

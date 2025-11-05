@@ -625,6 +625,42 @@ export async function acceptFriendRequest(friendshipId: string) {
   return data;
 }
 
+export async function rejectFriendRequest(friendshipId: string) {
+  const { data, error } = await supabase
+    .from('friendships')
+    .update({ status: 'rejected' })
+    .eq('id', friendshipId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getFriendshipStatus(userAId: string, userBId: string) {
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('*')
+    .or(`and(requester_id.eq.${userAId},addressee_id.eq.${userBId}),and(requester_id.eq.${userBId},addressee_id.eq.${userAId})`)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+export async function listPendingFriendRequests(userId: string) {
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('*, requester:user_profiles!friendships_requester_id_fkey(*)')
+    .eq('addressee_id', userId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
 // Comments API
 export async function addComment(achievementId: string, userId: string, content: string) {
   const { data, error } = await supabase
