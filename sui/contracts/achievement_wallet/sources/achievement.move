@@ -10,6 +10,8 @@ module achievement_wallet::achievement {
         id: UID,
         owner: address,
         verifier: address,
+        event_id: vector<u8>, // Event ID (can be empty for non-event achievements)
+        event_name: String,    // Event name (can be empty)
         category: String,
         title: String,
         description: String,
@@ -31,6 +33,33 @@ module achievement_wallet::achievement {
         gps_data: vector<u8>,
         ctx: &mut TxContext
     ) {
+        mint_certificate_with_event(
+            verifier_cap,
+            owner,
+            vector::empty<u8>(), // empty event_id
+            vector::empty<u8>(), // empty event_name
+            category,
+            title,
+            description,
+            proof_hash,
+            gps_data,
+            ctx
+        );
+    }
+
+    /// Mint and immediately verify a certificate with event info (requires VerifierCap)
+    public entry fun mint_certificate_with_event(
+        verifier_cap: &VerifierCap,
+        owner: address,
+        event_id: vector<u8>,
+        event_name: vector<u8>,
+        category: vector<u8>,
+        title: vector<u8>,
+        description: vector<u8>,
+        proof_hash: vector<u8>,
+        gps_data: vector<u8>,
+        ctx: &mut TxContext
+    ) {
         // Silence unused warning to assert possession of cap
         let _cap_id = object::id(verifier_cap);
 
@@ -38,6 +67,7 @@ module achievement_wallet::achievement {
         let title_string = string::utf8(title);
         let description_string = string::utf8(description);
         let gps_string = string::utf8(gps_data);
+        let event_name_string = string::utf8(event_name);
         let timestamp = tx_context::epoch_timestamp_ms(ctx);
         let sender = tx_context::sender(ctx);
 
@@ -45,6 +75,8 @@ module achievement_wallet::achievement {
             id: object::new(ctx),
             owner,
             verifier: sender,
+            event_id,
+            event_name: event_name_string,
             category: category_string,
             title: title_string,
             description: description_string,
@@ -109,16 +141,44 @@ module achievement_wallet::achievement {
         gps_data: vector<u8>,
         ctx: &mut TxContext
     ) {
+        mint_achievement_with_event(
+            owner,
+            vector::empty<u8>(), // empty event_id
+            vector::empty<u8>(), // empty event_name
+            category,
+            title,
+            description,
+            proof_hash,
+            gps_data,
+            ctx
+        );
+    }
+
+    /// Mint a new achievement with event info (pending verification)
+    public entry fun mint_achievement_with_event(
+        owner: address,
+        event_id: vector<u8>,
+        event_name: vector<u8>,
+        category: vector<u8>,
+        title: vector<u8>,
+        description: vector<u8>,
+        proof_hash: vector<u8>,
+        gps_data: vector<u8>,
+        ctx: &mut TxContext
+    ) {
         let category_string = string::utf8(category);
         let title_string = string::utf8(title);
         let description_string = string::utf8(description);
         let gps_string = string::utf8(gps_data);
+        let event_name_string = string::utf8(event_name);
         let timestamp = tx_context::epoch_timestamp_ms(ctx);
 
         let achievement = Achievement {
             id: object::new(ctx),
             owner,
             verifier: @0x0,
+            event_id,
+            event_name: event_name_string,
             category: category_string,
             title: title_string,
             description: description_string,
@@ -140,6 +200,68 @@ module achievement_wallet::achievement {
             category: category_string,
             timestamp,
         });
+    }
+
+    /// Batch mint event badges for multiple owners
+    public entry fun batch_mint_event_badges(
+        verifier_cap: &VerifierCap,
+        owners: vector<address>,
+        event_id: vector<u8>,
+        event_name: vector<u8>,
+        category: vector<u8>,
+        title: vector<u8>,
+        description: vector<u8>,
+        ctx: &mut TxContext
+    ) {
+        // Silence unused warning to assert possession of cap
+        let _cap_id = object::id(verifier_cap);
+
+        let category_string = string::utf8(category);
+        let title_string = string::utf8(title);
+        let description_string = string::utf8(description);
+        let event_name_string = string::utf8(event_name);
+        let timestamp = tx_context::epoch_timestamp_ms(ctx);
+        let sender = tx_context::sender(ctx);
+        let tx_hash = tx_context::tx_hash(ctx);
+
+        let i = 0;
+        let len = vector::length(&owners);
+        while (i < len) {
+            let owner = *vector::borrow(&owners, i);
+            
+            let achievement = Achievement {
+                id: object::new(ctx),
+                owner,
+                verifier: sender,
+                event_id: event_id, // Copy event_id for each
+                event_name: event_name_string,
+                category: category_string,
+                title: title_string,
+                description: description_string,
+                proof_hash: vector::empty<u8>(), // Empty for batch minting
+                timestamp,
+                gps_data: string::utf8(b""),
+                verified: true,
+                sui_transaction_id: tx_hash,
+            };
+
+            let achievement_id = object::id(&achievement);
+            transfer::transfer(achievement, owner);
+
+            event::emit(AchievementCreated {
+                achievement_id,
+                owner,
+                category: category_string,
+                timestamp,
+            });
+            event::emit(AchievementVerified {
+                achievement_id,
+                verifier: sender,
+                timestamp,
+            });
+
+            i = i + 1;
+        };
     }
 
     /// Verify an achievement (only verifiers can call this)

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Award, Shield, Users, Zap, ArrowRight } from 'lucide-react';
+import { Award, Shield, Users, Zap, ArrowRight, Calendar, MapPin, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WalletConnect } from '@/components/WalletConnect';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,7 +9,7 @@ export function Landing() {
   const { connectWallet, user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50">
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <motion.div
@@ -18,17 +18,17 @@ export function Landing() {
           transition={{ duration: 0.6 }}
           className="text-center"
         >
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-6 shadow-lg">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#ff3800] to-[#ff5500] rounded-2xl mb-6 shadow-lg">
             <Award className="w-10 h-10 text-white" />
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Achievement Wallet
+            SpotMe
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Capture, verify, and showcase your achievements in a trusted and decentralized way. 
-            Build your digital portfolio with blockchain-verified credentials.
+            Discover events, attend, and earn verified digital badges. 
+            Build your portfolio with blockchain-verified event achievements.
           </p>
 
           {user ? (
@@ -48,19 +48,19 @@ export function Landing() {
         {/* Features Grid */}
         <div className="mt-20 grid md:grid-cols-3 gap-8">
           <FeatureCard
-            icon={Shield}
-            title="Blockchain Verified"
-            description="All achievements are verified on-chain using Sui blockchain, ensuring authenticity and immutability."
+            icon={Calendar}
+            title="Discover Local Events"
+            description="Find and join events near you. Browse upcoming events, register with QR codes or event codes, and never miss an opportunity."
           />
           <FeatureCard
-            icon={Users}
-            title="Peer Verification"
-            description="Friends can verify your achievements when you're not available, creating a trusted social network."
+            icon={CheckCircle}
+            title="Verify Your Attendance"
+            description="Location-based verification ensures authenticity. Take a photo at the event with GPS and timestamp verification for fraud prevention."
           />
           <FeatureCard
-            icon={Zap}
-            title="Skill Points & Rewards"
-            description="Earn points for verified achievements and unlock new levels and badges as you grow."
+            icon={Award}
+            title="Earn Blockchain Badges"
+            description="Receive soulbound NFT badges as proof of attendance. Build your verified portfolio of event achievements on the Sui blockchain."
           />
         </div>
       </div>
@@ -76,8 +76,8 @@ function FeatureCard({ icon: Icon, title, description }: { icon: any; title: str
       transition={{ duration: 0.4, delay: 0.2 }}
       className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
     >
-      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-        <Icon className="w-6 h-6 text-blue-600" />
+      <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
+        <Icon className="w-6 h-6 text-[#ff3800]" />
       </div>
       <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
       <p className="text-gray-600">{description}</p>

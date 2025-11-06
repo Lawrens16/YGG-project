@@ -1,30 +1,53 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserProfile, getAchievements, getFriendshipStatus, sendFriendRequest } from '@/lib/api';
-import { Card, CardContent } from '@/components/ui/card';
+import { getUserProfile, getAchievements, isFollowing, followUser, unfollowUser, updateUserProfile, listPendingFriendRequests, acceptFriendRequest, rejectFriendRequest } from '@/lib/api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { AchievementCard } from '@/components/AchievementCard';
-import { Award, Calendar, UserPlus } from 'lucide-react';
+import { Award, Calendar, UserPlus, Settings, Camera, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getLevelFromPoints } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/lib/supabase';
 import type { UserProfile, Achievement } from '@/types';
 
 export function Profile() {
   const { id } = useParams();
-  const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { user: currentUser, updateUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [friendshipStatus, setFriendshipStatus] = useState<'none' | 'pending' | 'accepted' | 'rejected' | 'blocked'>('none');
-  const [friendshipLoading, setFriendshipLoading] = useState(false);
+  const [isFollowingUser, setIsFollowingUser] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  
+  const [formData, setFormData] = useState({
+    display_name: '',
+    bio: '',
+    school_name: '',
+    course_name: '',
+    privacy_level: 'friends' as 'private' | 'friends' | 'public',
+  });
 
   useEffect(() => {
     if (id) {
       loadProfile();
+      if (currentUser?.id === id) {
+        loadPendingRequests();
+      }
     }
-  }, [id]);
+  }, [id, currentUser]);
 
   async function loadProfile() {
     if (!id) return;
@@ -32,13 +55,20 @@ export function Profile() {
     try {
       const profileData = await getUserProfile(id);
       setProfile(profileData);
+      setFormData({
+        display_name: profileData.display_name || '',
+        bio: profileData.bio || '',
+        school_name: profileData.school_name || '',
+        course_name: profileData.course_name || '',
+        privacy_level: profileData.privacy_level || 'friends',
+      });
 
       const achievementsData = await getAchievements({ userId: id });
       setAchievements(achievementsData as Achievement[]);
 
-      if (currentUser && id) {
-        const fs = await getFriendshipStatus(currentUser.id, id);
-        setFriendshipStatus(fs ? (fs.status as any) : 'none');
+      if (currentUser && id && currentUser.id !== id) {
+        const following = await isFollowing(currentUser.id, id);
+        setIsFollowingUser(following);
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -47,17 +77,112 @@ export function Profile() {
     }
   }
 
-  async function handleAddFriend() {
-    if (!currentUser || !profile) return;
+  async function loadPendingRequests() {
+    if (!currentUser) return;
+    setLoadingRequests(true);
     try {
-      setFriendshipLoading(true);
-      await sendFriendRequest(currentUser.id, profile.id);
-      setFriendshipStatus('pending');
+      const data = await listPendingFriendRequests(currentUser.id);
+      setPendingRequests(data);
     } catch (e) {
-      console.error('Failed to send friend request', e);
-      alert('Failed to send friend request.');
+      console.error('Failed to load friend requests', e);
     } finally {
-      setFriendshipLoading(false);
+      setLoadingRequests(false);
+    }
+  }
+
+  async function handleFollow() {
+    if (!currentUser || !profile || followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowingUser) {
+        await unfollowUser(currentUser.id, profile.id);
+        setIsFollowingUser(false);
+      } else {
+        await followUser(currentUser.id, profile.id);
+        setIsFollowingUser(true);
+      }
+    } catch (e) {
+      console.error('Failed to follow/unfollow', e);
+      alert('Failed to follow/unfollow user.');
+    } finally {
+      setFollowLoading(false);
+    }
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser || !profile || currentUser.id !== profile.id) return;
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUser.id}-avatar-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      await updateUserProfile(currentUser.id, { avatar_url: publicUrl });
+      setProfile({ ...profile, avatar_url: publicUrl });
+      updateUser({ avatar_url: publicUrl });
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Failed to upload avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  async function handleBannerUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser || !profile || currentUser.id !== profile.id) return;
+
+    setUploadingBanner(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentUser.id}-banner-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('banners')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('banners')
+        .getPublicUrl(fileName);
+
+      await updateUserProfile(currentUser.id, { banner_url: publicUrl });
+      setProfile({ ...profile, banner_url: publicUrl });
+      updateUser({ banner_url: publicUrl });
+    } catch (error) {
+      console.error('Error uploading banner:', error);
+      alert('Failed to upload banner');
+    } finally {
+      setUploadingBanner(false);
+    }
+  }
+
+  async function handleSaveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentUser || !profile || currentUser.id !== profile.id) return;
+    
+    setSaving(true);
+    try {
+      await updateUserProfile(currentUser.id, formData);
+      setProfile({ ...profile, ...formData });
+      updateUser(formData);
+      setShowSettings(false);
+      alert('Settings saved successfully!');
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      alert('Failed to update settings');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -77,21 +202,67 @@ export function Profile() {
     );
   }
 
-  const level = getLevelFromPoints(profile.skill_points);
   const isOwnProfile = currentUser?.id === profile.id;
 
   return (
     <div className="max-w-4xl mx-auto">
       {/* Profile Header */}
       <Card className="mb-6 overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-blue-500 to-blue-600"></div>
+        <div className="relative h-48 bg-gradient-to-r from-[#ff3800] to-[#ff5500]">
+          {profile.banner_url && (
+            <img
+              src={profile.banner_url}
+              alt="Banner"
+              className="w-full h-full object-cover"
+            />
+          )}
+          {isOwnProfile && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white"
+              onClick={() => bannerInputRef.current?.click()}
+              disabled={uploadingBanner}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              {uploadingBanner ? 'Uploading...' : 'Edit Banner'}
+            </Button>
+          )}
+          <input
+            ref={bannerInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleBannerUpload}
+            className="hidden"
+          />
+        </div>
         <CardContent className="pt-0">
           <div className="flex flex-col md:flex-row items-start md:items-end space-y-4 md:space-y-0 md:space-x-6 -mt-16">
-            <Avatar
-              src={profile.avatar_url || undefined}
-              alt={profile.display_name || 'User'}
-              className="w-24 h-24 border-4 border-white"
-            />
+            <div className="relative">
+              <Avatar
+                src={profile.avatar_url || undefined}
+                alt={profile.display_name || 'User'}
+                className="w-24 h-24 border-4 border-white"
+              />
+              {isOwnProfile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute bottom-0 right-0 rounded-full bg-white border-2 border-gray-200 hover:bg-gray-50"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                >
+                  <Camera className="h-4 w-4" />
+                </Button>
+              )}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {profile.display_name || 'Anonymous'}
@@ -111,26 +282,176 @@ export function Profile() {
                 )}
               </div>
             </div>
-            {!isOwnProfile && (
-              friendshipStatus === 'none' ? (
-                <Button onClick={handleAddFriend} disabled={friendshipLoading}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  {friendshipLoading ? 'Sending...' : 'Add Friend'}
+            <div className="flex gap-2">
+              {isOwnProfile ? (
+                <Button onClick={() => setShowSettings(!showSettings)} variant="outline">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
                 </Button>
-              ) : friendshipStatus === 'pending' ? (
-                <Badge variant="secondary">Request Pending</Badge>
-              ) : friendshipStatus === 'accepted' ? (
-                <Badge variant="default">Friends</Badge>
               ) : (
-                <Badge variant="outline">{friendshipStatus}</Badge>
-              )
-            )}
+                <Button onClick={handleFollow} disabled={followLoading}>
+                  {isFollowingUser ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Following
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Follow
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Settings Panel */}
+      {showSettings && isOwnProfile && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSaveSettings} className="space-y-4">
+              <div>
+                <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 mb-2">
+                  Display Name
+                </label>
+                <Input
+                  id="display_name"
+                  value={formData.display_name}
+                  onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-2">
+                  Bio
+                </label>
+                <Textarea
+                  id="bio"
+                  value={formData.bio}
+                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                  rows={4}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="school_name" className="block text-sm font-medium text-gray-700 mb-2">
+                  School Name
+                </label>
+                <Input
+                  id="school_name"
+                  value={formData.school_name}
+                  onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="course_name" className="block text-sm font-medium text-gray-700 mb-2">
+                  Course Name
+                </label>
+                <Input
+                  id="course_name"
+                  value={formData.course_name}
+                  onChange={(e) => setFormData({ ...formData, course_name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="privacy_level" className="block text-sm font-medium text-gray-700 mb-2">
+                  Privacy Level
+                </label>
+                <select
+                  id="privacy_level"
+                  value={formData.privacy_level}
+                  onChange={(e) => setFormData({ ...formData, privacy_level: e.target.value as any })}
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="private">Private</option>
+                  <option value="friends">Friends Only</option>
+                  <option value="public">Public</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <Button type="submit" disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setShowSettings(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+
+            {/* Pending Friend Requests */}
+            {pendingRequests.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <h3 className="font-semibold mb-4">Pending Friend Requests</h3>
+                <div className="space-y-3">
+                  {pendingRequests.map((req) => (
+                    <div key={req.id} className="flex items-center justify-between p-3 border rounded-md">
+                      <div className="flex items-center space-x-3">
+                        <Avatar
+                          src={(req.requester as UserProfile)?.avatar_url || undefined}
+                          alt={(req.requester as UserProfile)?.display_name || 'User'}
+                          className="w-10 h-10"
+                        />
+                        <div>
+                          <p className="font-medium text-gray-900">{(req.requester as UserProfile)?.display_name || 'Anonymous'}</p>
+                          <p className="text-xs text-gray-500">sent you a friend request</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            await acceptFriendRequest(req.id);
+                            await loadPendingRequests();
+                          }}
+                        >
+                          Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            await rejectFriendRequest(req.id);
+                            await loadPendingRequests();
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Wallet Information */}
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="font-semibold mb-4">Wallet Information</h3>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm text-gray-500">Wallet Address</p>
+                  <p className="font-mono text-sm text-gray-900 break-all">{profile.wallet_address}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Is Organizer</p>
+                  <p className="text-sm text-gray-900">{profile.is_organizer ? 'Yes' : 'No'}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats */}
-      <div className="grid md:grid-cols-3 gap-4 mb-6">
+      <div className="grid md:grid-cols-2 gap-4 mb-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -138,20 +459,7 @@ export function Profile() {
                 <p className="text-sm text-gray-500">Skill Points</p>
                 <p className="text-3xl font-bold text-gray-900">{profile.skill_points}</p>
               </div>
-              <Award className="w-10 h-10 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Level</p>
-                <p className="text-3xl font-bold text-gray-900">{level.level}</p>
-                <p className="text-xs text-gray-500">{level.title}</p>
-              </div>
-              <Badge variant="default">{level.title}</Badge>
+              <Award className="w-10 h-10 text-[#ff3800]" />
             </div>
           </CardContent>
         </Card>

@@ -1,7 +1,9 @@
 import { supabase } from './supabase';
-import type { Achievement, UserProfile, PeerTag } from '../types';
+import type { Achievement, UserProfile, PeerTag, Event, EventRegistration, BadgeTemplate, Follower } from '../types';
 
 // --- Lightweight client-side mock fallback when Supabase isn't configured ---
+const ALLOW_MOCK = import.meta.env.VITE_SUPABASE_ALLOW_MOCK === 'true';
+
 function isSupabaseConfigured(): boolean {
   try {
     // Accessing a property will throw if not configured (due to Proxy)
@@ -13,6 +15,7 @@ function isSupabaseConfigured(): boolean {
 }
 
 function shouldMockOnError(error: any): boolean {
+  if (!ALLOW_MOCK) return false;
   if (!error) return false;
   // Fallback to mock for common connectivity/schema errors
   const status = error.status || error.code;
@@ -92,13 +95,15 @@ export async function createUserProfile(profile: Partial<UserProfile>) {
       wallet_address: profile.wallet_address || '0x',
       display_name: profile.display_name || null,
       avatar_url: profile.avatar_url || null,
+      banner_url: profile.banner_url || null,
       bio: profile.bio || null,
       school_name: profile.school_name || null,
       course_name: profile.course_name || null,
       privacy_level: (profile.privacy_level as any) || 'friends',
       skill_points: profile.skill_points ?? 0,
-      level: profile.level ?? 1,
       is_organizer: profile.is_organizer ?? false,
+      is_admin: profile.is_admin ?? false,
+      organizer_application_status: profile.organizer_application_status ?? null,
       created_at: now,
       updated_at: now,
     };
@@ -513,7 +518,7 @@ export async function getUserProfile(userId: string) {
   }
 }
 
-// Feed API (get achievements from friends)
+// Feed API (get achievements from mutual followers/friends)
 export async function getFeedAchievements(userId: string, limit = 20) {
   if (!isSupabaseConfigured()) {
     // Very simple mock: show all verified achievements by any user
@@ -521,24 +526,9 @@ export async function getFeedAchievements(userId: string, limit = 20) {
     return all;
   }
   try {
-    // Get accepted friendships
-    const { data: friendships, error: friendsError } = await supabase
-      .from('friendships')
-      .select('requester_id, addressee_id')
-      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
-      .eq('status', 'accepted');
-
-    if (friendsError) {
-      if (shouldMockOnError(friendsError)) {
-        const all = (await getAchievements({ status: 'verified', limit })) as Achievement[];
-        return all;
-      }
-      throw friendsError;
-    }
-
-    const friendIds = friendships?.flatMap((f: any) =>
-      f.requester_id === userId ? [f.addressee_id] : [f.requester_id]
-    ) || [];
+    // Get mutual followers (friends)
+    const mutualFriends = await getMutualFollowers(userId);
+    const friendIds = mutualFriends.map(f => f.id);
 
     // Get achievements from friends (public or friends-only)
     const { data, error } = await supabase
@@ -734,5 +724,708 @@ export async function getReactions(achievementId: string) {
   
   if (error) throw error;
   return data || [];
+}
+
+// ========== EVENT MANAGEMENT API ==========
+
+/**
+ * Generate a unique 6-character event code
+ */
+export async function generateEventCode(): Promise<string> {
+  if (!isSupabaseConfigured()) {
+    // Simple mock: generate random 6-char code
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  }
+  try {
+    // Call the database function
+    const { data, error } = await supabase.rpc('generate_event_code');
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    }
+    throw e;
+  }
+}
+
+/**
+ * Create a new event
+ */
+export async function createEvent(event: Partial<Event>): Promise<Event> {
+  if (!event.event_code) {
+    event.event_code = await generateEventCode();
+  }
+  
+  if (!isSupabaseConfigured()) {
+    const now = new Date().toISOString();
+    const newEvent: Event = {
+      id: uuid(),
+      organizer_id: event.organizer_id!,
+      name: event.name!,
+      description: event.description || null,
+      venue_address: event.venue_address!,
+      venue_latitude: event.venue_latitude ?? null,
+      venue_longitude: event.venue_longitude ?? null,
+      start_date: event.start_date!,
+      end_date: event.end_date!,
+      contact_info: event.contact_info || null,
+      email: event.email || null,
+      capacity: event.capacity ?? null,
+      banner_url: event.banner_url || null,
+      qr_code_url: event.qr_code_url || null,
+      event_code: event.event_code,
+      status: (event.status as any) || 'upcoming',
+      created_at: now,
+      updated_at: now,
+    };
+    return newEvent;
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .insert(event)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Update an event
+ */
+export async function updateEvent(eventId: string, updates: Partial<Event>): Promise<Event> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock update not implemented');
+  }
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .update(updates)
+      .eq('id', eventId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Delete an event
+ */
+export async function deleteEvent(eventId: string): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock delete not implemented');
+  }
+  try {
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', eventId);
+    if (error) throw error;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get event by ID
+ */
+export async function getEvent(eventId: string): Promise<Event | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, user_profiles(*)')
+      .eq('id', eventId)
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get event by code
+ */
+export async function getEventByCode(eventCode: string): Promise<Event | null> {
+  if (!isSupabaseConfigured()) {
+    return null;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, user_profiles(*)')
+      .eq('event_code', eventCode.toUpperCase())
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get events by organizer
+ */
+export async function getEventsByOrganizer(organizerId: string): Promise<Event[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, user_profiles(*)')
+      .eq('organizer_id', organizerId)
+      .order('start_date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get nearby events (within radius in km)
+ */
+export async function getNearbyEvents(
+  latitude: number,
+  longitude: number,
+  radiusKm: number = 10
+): Promise<Event[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    // Use PostGIS or calculate distance in query
+    // For now, simple bounding box approximation
+    const latDelta = radiusKm / 111; // ~111 km per degree latitude
+    const lngDelta = radiusKm / (111 * Math.cos(latitude * Math.PI / 180));
+    
+    const { data, error } = await supabase
+      .from('events')
+      .select('*, user_profiles(*)')
+      .gte('venue_latitude', latitude - latDelta)
+      .lte('venue_latitude', latitude + latDelta)
+      .gte('venue_longitude', longitude - lngDelta)
+      .lte('venue_longitude', longitude + lngDelta)
+      .in('status', ['upcoming', 'ongoing'])
+      .order('start_date', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get all events (for admin/feed)
+ */
+export async function getAllEvents(filters?: {
+  status?: string;
+  limit?: number;
+}): Promise<Event[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    let query = supabase
+      .from('events')
+      .select('*, user_profiles(*)')
+      .order('start_date', { ascending: false });
+    
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+// ========== EVENT REGISTRATION API ==========
+
+/**
+ * Register for an event
+ */
+export async function registerForEvent(eventId: string, userId: string): Promise<EventRegistration> {
+  if (!isSupabaseConfigured()) {
+    const now = new Date().toISOString();
+    return {
+      id: uuid(),
+      event_id: eventId,
+      user_id: userId,
+      verification_status: 'registered',
+      verification_photo_url: null,
+      verification_timestamp: null,
+      verification_gps_latitude: null,
+      verification_gps_longitude: null,
+      badge_issued: false,
+      sui_object_id: null,
+      created_at: now,
+      verified_at: null,
+    };
+  }
+  try {
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .insert({
+        event_id: eventId,
+        user_id: userId,
+        verification_status: 'registered',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get event registrations
+ */
+export async function getEventRegistrations(eventId: string): Promise<EventRegistration[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .select('*, user_profiles(*), events(*)')
+      .eq('event_id', eventId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get user registrations
+ */
+export async function getUserRegistrations(userId: string): Promise<EventRegistration[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .select('*, events(*)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Verify attendance
+ */
+export async function verifyAttendance(
+  registrationId: string,
+  photoUrl: string,
+  gpsLat: number,
+  gpsLng: number,
+  timestamp: Date
+): Promise<EventRegistration> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock verify not implemented');
+  }
+  try {
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .update({
+        verification_status: 'verified',
+        verification_photo_url: photoUrl,
+        verification_timestamp: timestamp.toISOString(),
+        verification_gps_latitude: gpsLat,
+        verification_gps_longitude: gpsLng,
+        verified_at: new Date().toISOString(),
+      })
+      .eq('id', registrationId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Issue badges for verified attendees (batch)
+ */
+export async function issueEventBadges(eventId: string): Promise<EventRegistration[]> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock issue badges not implemented');
+  }
+  try {
+    // Get all verified registrations that haven't received badges
+    const { data: registrations, error: fetchError } = await supabase
+      .from('event_registrations')
+      .select('*')
+      .eq('event_id', eventId)
+      .eq('verification_status', 'verified')
+      .eq('badge_issued', false);
+    
+    if (fetchError) throw fetchError;
+    
+    // Update all to badge_issued = true
+    const registrationIds = registrations?.map(r => r.id) || [];
+    if (registrationIds.length === 0) return [];
+    
+    const { data, error } = await supabase
+      .from('event_registrations')
+      .update({ badge_issued: true })
+      .in('id', registrationIds)
+      .select();
+    
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+// ========== ADMIN API ==========
+
+/**
+ * Apply for organizer status
+ */
+export async function applyForOrganizer(userId: string, applicationData: any): Promise<UserProfile> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock apply not implemented');
+  }
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({
+        organizer_application_status: 'pending',
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Approve organizer application
+ */
+export async function approveOrganizer(userId: string): Promise<UserProfile> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock approve not implemented');
+  }
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({
+        organizer_application_status: 'approved',
+        is_organizer: true,
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Reject organizer application
+ */
+export async function rejectOrganizer(userId: string): Promise<UserProfile> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock reject not implemented');
+  }
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({
+        organizer_application_status: 'rejected',
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Revoke organizer privileges
+ */
+export async function revokeOrganizer(userId: string): Promise<UserProfile> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Mock revoke not implemented');
+  }
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({
+        is_organizer: false,
+        organizer_application_status: null,
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get pending organizer applications
+ */
+export async function getPendingOrganizerApplications(): Promise<UserProfile[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('organizer_application_status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+// ========== FOLLOW/UNFOLLOW API ==========
+
+/**
+ * Follow a user
+ */
+export async function followUser(followerId: string, followedId: string): Promise<Follower> {
+  if (!isSupabaseConfigured()) {
+    const now = new Date().toISOString();
+    return {
+      id: uuid(),
+      follower_id: followerId,
+      followed_id: followedId,
+      followed_at: now,
+    };
+  }
+  try {
+    const { data, error } = await supabase
+      .from('followers')
+      .insert({
+        follower_id: followerId,
+        followed_id: followedId,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Unfollow a user
+ */
+export async function unfollowUser(followerId: string, followedId: string): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+  try {
+    const { error } = await supabase
+      .from('followers')
+      .delete()
+      .eq('follower_id', followerId)
+      .eq('followed_id', followedId);
+    if (error) throw error;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get followers of a user
+ */
+export async function getFollowers(userId: string): Promise<Follower[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('followers')
+      .select('*, follower:user_profiles!followers_follower_id_fkey(*)')
+      .eq('followed_id', userId)
+      .order('followed_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get users that a user is following
+ */
+export async function getFollowing(userId: string): Promise<Follower[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('followers')
+      .select('*, followed:user_profiles!followers_followed_id_fkey(*)')
+      .eq('follower_id', userId)
+      .order('followed_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Check if user A follows user B
+ */
+export async function isFollowing(followerId: string, followedId: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) {
+    return false;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('followers')
+      .select('id')
+      .eq('follower_id', followerId)
+      .eq('followed_id', followedId)
+      .maybeSingle();
+    if (error) throw error;
+    return !!data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get mutual followers (friends)
+ */
+export async function getMutualFollowers(userId: string): Promise<UserProfile[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    // Get users that both follow each other
+    const { data, error } = await supabase
+      .rpc('get_mutual_followers', { user_id: userId });
+    
+    if (error) {
+      // Fallback: manual query
+      const { data: following } = await getFollowing(userId);
+      const { data: followers } = await getFollowers(userId);
+      
+      const followingIds = new Set(following.map(f => f.followed_id));
+      const mutualIds = followers
+        .filter(f => followingIds.has(f.follower_id))
+        .map(f => f.follower_id);
+      
+      if (mutualIds.length === 0) return [];
+      
+      const { data: users, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .in('id', mutualIds);
+      
+      if (usersError) throw usersError;
+      return users || [];
+    }
+    
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+// ========== BADGE TEMPLATES API ==========
+
+/**
+ * Create badge template (admin only)
+ */
+export async function createBadgeTemplate(template: Partial<BadgeTemplate>): Promise<BadgeTemplate> {
+  if (!isSupabaseConfigured()) {
+    const now = new Date().toISOString();
+    return {
+      id: uuid(),
+      name: template.name!,
+      description: template.description || null,
+      category: template.category || null,
+      metadata_uri: template.metadata_uri || null,
+      image_url: template.image_url || null,
+      created_by: template.created_by || null,
+      is_active: template.is_active ?? true,
+      created_at: now,
+    };
+  }
+  try {
+    const { data, error } = await supabase
+      .from('badge_templates')
+      .insert(template)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    throw e;
+  }
+}
+
+/**
+ * Get all badge templates
+ */
+export async function getBadgeTemplates(): Promise<BadgeTemplate[]> {
+  if (!isSupabaseConfigured()) {
+    return [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('badge_templates')
+      .select('*, user_profiles(*)')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (e: any) {
+    throw e;
+  }
 }
 

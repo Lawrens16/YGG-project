@@ -188,3 +188,119 @@ export async function mintCertificate(args: MintCertificateArgs): Promise<{ dige
   return { digest, created };
 }
 
+export type MintEventBadgeArgs = {
+  owner: string;
+  eventId: string;
+  eventName: string;
+  category: string;
+  title: string;
+  description: string;
+  proofHash: Uint8Array;
+  gpsData: string;
+};
+
+/**
+ * Mint an event badge (requires VerifierCap)
+ */
+export async function mintEventBadge(args: MintEventBadgeArgs): Promise<{ digest: string; created?: string }> {
+  const pkg = PACKAGE_ID;
+  if (!pkg || pkg === '0x0') throw new Error('VITE_SUI_PACKAGE_ID is not set');
+
+  const txb = new TransactionBlock();
+  const enc = new TextEncoder();
+  
+  // Get VerifierCap (shared object)
+  const verifierCap = txb.object('0xVERIFIER_CAP'); // This should be the actual VerifierCap object ID
+  
+  txb.moveCall({
+    target: `${pkg}::achievement::mint_certificate_with_event`,
+    arguments: [
+      verifierCap,
+      txb.pure(args.owner),
+      txb.pure(Array.from(enc.encode(args.eventId))),
+      txb.pure(Array.from(enc.encode(args.eventName))),
+      txb.pure(Array.from(enc.encode(args.category))),
+      txb.pure(Array.from(enc.encode(args.title))),
+      txb.pure(Array.from(enc.encode(args.description))),
+      txb.pure(Array.from(args.proofHash)),
+      txb.pure(Array.from(enc.encode(args.gpsData))),
+    ],
+  });
+
+  const wallet: any = (typeof window !== 'undefined') ? (window as any).suiWallet || (window as any).slush || (window as any).wallet : null;
+  if (!wallet || typeof wallet.request !== 'function') {
+    throw new Error('Sui-compatible wallet not found');
+  }
+
+  const res = await wallet.request({
+    method: 'sui_signAndExecuteTransactionBlock',
+    params: [{ transactionBlock: txb.serialize(), options: { showEffects: true, showObjectChanges: true } }],
+  });
+
+  const digest: string = res?.digest || res?.effectsCert?.effects?.transactionDigest || res?.effects?.transactionDigest;
+  let created: string | undefined;
+  const objectChanges: any[] = res?.objectChanges || res?.effects?.created || [];
+  if (Array.isArray(objectChanges)) {
+    const createdChange = objectChanges.find((c: any) => (c?.type === 'created' && c?.objectType?.includes('achievement::Achievement')) || c?.reference?.objectId);
+    created = createdChange?.objectId || createdChange?.reference?.objectId;
+  }
+  return { digest, created };
+}
+
+export type BatchMintEventBadgesArgs = {
+  owners: string[];
+  eventId: string;
+  eventName: string;
+  category: string;
+  title: string;
+  description: string;
+};
+
+/**
+ * Batch mint event badges for multiple owners (requires VerifierCap)
+ */
+export async function batchMintEventBadges(args: BatchMintEventBadgesArgs): Promise<{ digest: string; createdObjects: string[] }> {
+  const pkg = PACKAGE_ID;
+  if (!pkg || pkg === '0x0') throw new Error('VITE_SUI_PACKAGE_ID is not set');
+
+  const txb = new TransactionBlock();
+  const enc = new TextEncoder();
+  
+  // Get VerifierCap (shared object)
+  const verifierCap = txb.object('0xVERIFIER_CAP'); // This should be the actual VerifierCap object ID
+  
+  txb.moveCall({
+    target: `${pkg}::achievement::batch_mint_event_badges`,
+    arguments: [
+      verifierCap,
+      txb.pure(args.owners),
+      txb.pure(Array.from(enc.encode(args.eventId))),
+      txb.pure(Array.from(enc.encode(args.eventName))),
+      txb.pure(Array.from(enc.encode(args.category))),
+      txb.pure(Array.from(enc.encode(args.title))),
+      txb.pure(Array.from(enc.encode(args.description))),
+    ],
+  });
+
+  const wallet: any = (typeof window !== 'undefined') ? (window as any).suiWallet || (window as any).slush || (window as any).wallet : null;
+  if (!wallet || typeof wallet.request !== 'function') {
+    throw new Error('Sui-compatible wallet not found');
+  }
+
+  const res = await wallet.request({
+    method: 'sui_signAndExecuteTransactionBlock',
+    params: [{ transactionBlock: txb.serialize(), options: { showEffects: true, showObjectChanges: true } }],
+  });
+
+  const digest: string = res?.digest || res?.effectsCert?.effects?.transactionDigest || res?.effects?.transactionDigest;
+  const createdObjects: string[] = [];
+  const objectChanges: any[] = res?.objectChanges || res?.effects?.created || [];
+  if (Array.isArray(objectChanges)) {
+    const createdChanges = objectChanges.filter((c: any) => 
+      (c?.type === 'created' && c?.objectType?.includes('achievement::Achievement')) || c?.reference?.objectId
+    );
+    createdObjects.push(...createdChanges.map((c: any) => c?.objectId || c?.reference?.objectId).filter(Boolean));
+  }
+  return { digest, createdObjects };
+}
+
