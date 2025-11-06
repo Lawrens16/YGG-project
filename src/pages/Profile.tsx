@@ -113,26 +113,70 @@ export function Profile() {
     const file = e.target.files?.[0];
     if (!file || !currentUser || !profile || currentUser.id !== profile.id) return;
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
     setUploadingAvatar(true);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}-avatar-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file);
+      
+      // Check if Supabase is configured
+      if (!supabase || typeof supabase.storage === 'undefined') {
+        throw new Error('Storage is not configured. Please check your Supabase settings.');
+      }
 
-      if (uploadError) throw uploadError;
+      // Try to upload
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        // Check if bucket doesn't exist
+        if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('not found')) {
+          throw new Error('Storage bucket "avatars" not found. Please create it in your Supabase dashboard.');
+        }
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
-      await updateUserProfile(currentUser.id, { avatar_url: publicUrl });
-      setProfile({ ...profile, avatar_url: publicUrl });
-      updateUser({ avatar_url: publicUrl });
-    } catch (error) {
+      // Update user profile with new avatar URL
+      try {
+        await updateUserProfile(currentUser.id, { avatar_url: publicUrl });
+        setProfile({ ...profile, avatar_url: publicUrl });
+        updateUser({ avatar_url: publicUrl });
+      } catch (updateError: any) {
+        console.error('Error updating profile:', updateError);
+        // If update fails but upload succeeded, still show success
+        // The file is uploaded, just the profile update failed
+        alert('File uploaded but failed to update profile. Error: ' + (updateError?.message || 'Unknown error'));
+        throw updateError;
+      }
+      
+      // Reset the input so the same file can be selected again
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    } catch (error: any) {
       console.error('Error uploading avatar:', error);
-      alert('Failed to upload avatar');
+      const errorMessage = error?.message || 'Failed to upload avatar. Please try again.';
+      alert(errorMessage);
     } finally {
       setUploadingAvatar(false);
     }
@@ -142,26 +186,70 @@ export function Profile() {
     const file = e.target.files?.[0];
     if (!file || !currentUser || !profile || currentUser.id !== profile.id) return;
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 10MB for banners)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Banner size must be less than 10MB');
+      return;
+    }
+
     setUploadingBanner(true);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}-banner-${Date.now()}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage
-        .from('banners')
-        .upload(fileName, file);
+      
+      // Check if Supabase is configured
+      if (!supabase || typeof supabase.storage === 'undefined') {
+        throw new Error('Storage is not configured. Please check your Supabase settings.');
+      }
 
-      if (uploadError) throw uploadError;
+      // Try to upload
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('banners')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        // Check if bucket doesn't exist
+        if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('not found')) {
+          throw new Error('Storage bucket "banners" not found. Please create it in your Supabase dashboard.');
+        }
+        throw uploadError;
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('banners')
         .getPublicUrl(fileName);
 
-      await updateUserProfile(currentUser.id, { banner_url: publicUrl });
-      setProfile({ ...profile, banner_url: publicUrl });
-      updateUser({ banner_url: publicUrl });
-    } catch (error) {
+      // Update user profile with new banner URL
+      try {
+        await updateUserProfile(currentUser.id, { banner_url: publicUrl });
+        setProfile({ ...profile, banner_url: publicUrl });
+        updateUser({ banner_url: publicUrl });
+      } catch (updateError: any) {
+        console.error('Error updating profile:', updateError);
+        // If update fails but upload succeeded, still show success
+        // The file is uploaded, just the profile update failed
+        alert('File uploaded but failed to update profile. Error: ' + (updateError?.message || 'Unknown error'));
+        throw updateError;
+      }
+      
+      // Reset the input so the same file can be selected again
+      if (bannerInputRef.current) {
+        bannerInputRef.current.value = '';
+      }
+    } catch (error: any) {
       console.error('Error uploading banner:', error);
-      alert('Failed to upload banner');
+      const errorMessage = error?.message || 'Failed to upload banner. Please try again.';
+      alert(errorMessage);
     } finally {
       setUploadingBanner(false);
     }
@@ -207,8 +295,8 @@ export function Profile() {
   return (
     <div className="max-w-4xl mx-auto">
       {/* Profile Header */}
-      <Card className="mb-6 overflow-hidden">
-        <div className="relative h-48 bg-gradient-to-r from-[#ff3800] to-[#ff5500]">
+      <Card className="mb-6 overflow-visible">
+        <div className="relative h-48 bg-gradient-to-r from-[#ff3800] to-[#ff5500] overflow-hidden">
           {profile.banner_url && (
             <img
               src={profile.banner_url}
@@ -220,7 +308,7 @@ export function Profile() {
             <Button
               variant="ghost"
               size="sm"
-              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white"
+              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white z-20"
               onClick={() => bannerInputRef.current?.click()}
               disabled={uploadingBanner}
             >
@@ -236,19 +324,19 @@ export function Profile() {
             className="hidden"
           />
         </div>
-        <CardContent className="pt-0">
-          <div className="flex flex-col md:flex-row items-start md:items-end space-y-4 md:space-y-0 md:space-x-6 -mt-16">
-            <div className="relative">
+        <CardContent className="pt-20 pb-6 relative z-10 bg-white">
+          <div className="flex flex-col md:flex-row items-start md:items-end space-y-4 md:space-y-0 md:space-x-6">
+            <div className="relative -mt-16">
               <Avatar
                 src={profile.avatar_url || undefined}
                 alt={profile.display_name || 'User'}
-                className="w-24 h-24 border-4 border-white"
+                className="w-24 h-24 border-4 border-white shadow-lg"
               />
               {isOwnProfile && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute bottom-0 right-0 rounded-full bg-white border-2 border-gray-200 hover:bg-gray-50"
+                  className="absolute bottom-0 right-0 rounded-full bg-white border-2 border-gray-200 hover:bg-gray-50 shadow-sm"
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
                 >
@@ -263,7 +351,7 @@ export function Profile() {
                 className="hidden"
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {profile.display_name || 'Anonymous'}
               </h1>
@@ -282,7 +370,7 @@ export function Profile() {
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-shrink-0">
               {isOwnProfile ? (
                 <Button onClick={() => setShowSettings(!showSettings)} variant="outline">
                   <Settings className="w-4 h-4 mr-2" />

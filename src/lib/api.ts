@@ -55,6 +55,9 @@ function uuid(): string {
 // Keys for localStorage mocks
 const LS_USERS = 'aw_user_profiles';
 const LS_ACHIEVEMENTS = 'aw_achievements';
+const LS_COMMENTS = 'aw_comments';
+const LS_REACTIONS = 'aw_reactions';
+const LS_FOLLOWERS = 'aw_followers';
 // const LS_FRIENDSHIPS = 'aw_friendships';
 
 // User API
@@ -365,6 +368,16 @@ export async function getAchievements(filters?: {
       }
       throw error;
     }
+    // Transform the data to ensure user_profiles is correctly mapped
+    // Supabase returns the relation as user_profiles (array), but we need a single object
+    if (data) {
+      return data.map((achievement: any) => ({
+        ...achievement,
+        user_profiles: Array.isArray(achievement.user_profiles) 
+          ? achievement.user_profiles[0] 
+          : achievement.user_profiles
+      }));
+    }
     return data;
   } catch (e: any) {
     if (shouldMockOnError(e)) {
@@ -518,7 +531,65 @@ export async function getUserProfile(userId: string) {
   }
 }
 
-// Feed API (get achievements from mutual followers/friends)
+/**
+ * Search users by username (display_name)
+ */
+export async function searchUsers(query: string, limit: number = 10): Promise<UserProfile[]> {
+  if (!query || query.trim().length === 0) {
+    return [];
+  }
+  
+  if (!isSupabaseConfigured()) {
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    const searchTerm = query.toLowerCase().trim();
+    return users
+      .filter((u) => 
+        u.display_name?.toLowerCase().includes(searchTerm) ||
+        u.school_name?.toLowerCase().includes(searchTerm) ||
+        u.course_name?.toLowerCase().includes(searchTerm)
+      )
+      .slice(0, limit);
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .or(`display_name.ilike.%${query}%,school_name.ilike.%${query}%,course_name.ilike.%${query}%`)
+      .limit(limit);
+    
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const users = lsGet<UserProfile[]>(LS_USERS, []);
+        const searchTerm = query.toLowerCase().trim();
+        return users
+          .filter((u) => 
+            u.display_name?.toLowerCase().includes(searchTerm) ||
+            u.school_name?.toLowerCase().includes(searchTerm) ||
+            u.course_name?.toLowerCase().includes(searchTerm)
+          )
+          .slice(0, limit);
+      }
+      throw error;
+    }
+    return data || [];
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      const searchTerm = query.toLowerCase().trim();
+      return users
+        .filter((u) => 
+          u.display_name?.toLowerCase().includes(searchTerm) ||
+          u.school_name?.toLowerCase().includes(searchTerm) ||
+          u.course_name?.toLowerCase().includes(searchTerm)
+        )
+        .slice(0, limit);
+    }
+    throw e;
+  }
+}
+
+// Feed API (get achievements from users you follow)
 export async function getFeedAchievements(userId: string, limit = 20) {
   if (!isSupabaseConfigured()) {
     // Very simple mock: show all verified achievements by any user
@@ -526,28 +597,58 @@ export async function getFeedAchievements(userId: string, limit = 20) {
     return all;
   }
   try {
-    // Get mutual followers (friends)
+    // Get mutual followers (friends) - users who follow each other (confirmed relationships)
     const mutualFriends = await getMutualFollowers(userId);
     const friendIds = mutualFriends.map(f => f.id);
 
-    // Get achievements from friends (public or friends-only)
+    // Also get users you're following (one-way follows)
+    const following = await getFollowing(userId);
+    const followedIds = following.map(f => f.followed_id);
+
+    // Combine both: mutual friends + one-way follows
+    // This ensures achievements show from both confirmed friends and users you follow
+    const allFollowedIds = [...new Set([...friendIds, ...followedIds])];
+
+    // If not following anyone, return empty array
+    if (allFollowedIds.length === 0) {
+      console.log('No followed users found for feed (mutual friends:', friendIds.length, ', one-way follows:', followedIds.length, ')');
+      return [];
+    }
+
+    console.log('Getting feed achievements for users (mutual:', friendIds.length, ', one-way:', followedIds.length, ', total:', allFollowedIds.length, '):', allFollowedIds);
+
+    // Get achievements from users you follow (public or friends-only)
     const { data, error } = await supabase
       .from('achievements')
       .select('*, user_profiles(*)')
-      .in('user_id', friendIds.length > 0 ? friendIds : ['00000000-0000-0000-0000-000000000000'])
+      .in('user_id', allFollowedIds)
       .in('status', ['verified'])
       .order('created_at', { ascending: false })
       .limit(limit);
 
     if (error) {
+      console.error('Error fetching feed achievements:', error);
       if (shouldMockOnError(error)) {
         const all = (await getAchievements({ status: 'verified', limit })) as Achievement[];
         return all;
       }
       throw error;
     }
+    
+    console.log('Found achievements:', data?.length || 0);
+    
+    // Transform the data to ensure user_profiles is correctly mapped
+    if (data) {
+      return data.map((achievement: any) => ({
+        ...achievement,
+        user_profiles: Array.isArray(achievement.user_profiles) 
+          ? achievement.user_profiles[0] 
+          : achievement.user_profiles
+      }));
+    }
     return data || [];
   } catch (e: any) {
+    console.error('Exception in getFeedAchievements:', e);
     if (shouldMockOnError(e)) {
       const all = (await getAchievements({ status: 'verified', limit })) as Achievement[];
       return all;
@@ -655,75 +756,465 @@ export async function listPendingFriendRequests(userId: string) {
   return data || [];
 }
 
-// Comments API
+// Comments API - Updated to reference 'achievements' table directly
 export async function addComment(achievementId: string, userId: string, content: string) {
-  const { data, error } = await supabase
-    .from('comments')
-    .insert({
+  
+  if (!isSupabaseConfigured()) {
+    const comments = lsGet<any[]>(LS_COMMENTS, []);
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    const now = new Date().toISOString();
+    const comment = {
+      id: uuid(),
       achievement_id: achievementId,
       user_id: userId,
       content,
-    })
-    .select('*, user_profiles(*)')
-    .single();
+      created_at: now,
+      user_profiles: users.find(u => u.id === userId) || null,
+    };
+    comments.push(comment);
+    lsSet(LS_COMMENTS, comments);
+    return comment;
+  }
   
-  if (error) throw error;
-  return data;
+  try {
+    // Try with achievement_id first
+    let insertData: any = {
+      user_id: userId,
+      content,
+    };
+    
+    // Try achievement_id
+    insertData.achievement_id = achievementId;
+    let { data, error } = await supabase
+      .from('comments')
+      .insert(insertData)
+      .select('*, user_profiles(*)')
+      .single();
+    
+    // If achievement_id column doesn't exist, fall back to mock storage
+    if (error && (error.code === '42703' || (error.message?.includes('column') && error.message?.includes('does not exist')))) {
+      console.warn('Comments table missing achievement_id column. Using localStorage fallback. Please run migration SQL.');
+      // Fall back to localStorage
+      if (shouldMockOnError(error)) {
+        const comments = lsGet<any[]>(LS_COMMENTS, []);
+        const users = lsGet<UserProfile[]>(LS_USERS, []);
+        const now = new Date().toISOString();
+        const comment = {
+          id: uuid(),
+          achievement_id: achievementId,
+          user_id: userId,
+          content,
+          created_at: now,
+          user_profiles: users.find(u => u.id === userId) || null,
+        };
+        comments.push(comment);
+        lsSet(LS_COMMENTS, comments);
+        return comment;
+      }
+      throw new Error('Please run the migration SQL to add achievement_id column to comments table. See: supabase/migrations/fix_likes_comments_schema.sql');
+    }
+    
+    if (error) {
+      console.error('Error adding comment to database:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      
+      if (shouldMockOnError(error)) {
+        const comments = lsGet<any[]>(LS_COMMENTS, []);
+        const users = lsGet<UserProfile[]>(LS_USERS, []);
+        const now = new Date().toISOString();
+        const comment = {
+          id: uuid(),
+          achievement_id: achievementId,
+          user_id: userId,
+          content,
+          created_at: now,
+          user_profiles: users.find(u => u.id === userId) || null,
+        };
+        comments.push(comment);
+        lsSet(LS_COMMENTS, comments);
+        return comment;
+      }
+      throw error;
+    }
+    // Transform the data to ensure user_profiles is correctly mapped
+    if (data) {
+      return {
+        ...data,
+        user_profiles: Array.isArray(data.user_profiles) 
+          ? data.user_profiles[0] 
+          : data.user_profiles || null,
+      };
+    }
+    return data;
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const comments = lsGet<any[]>(LS_COMMENTS, []);
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      const now = new Date().toISOString();
+      const comment = {
+        id: uuid(),
+        achievement_id: achievementId,
+        user_id: userId,
+        content,
+        created_at: now,
+        user_profiles: users.find(u => u.id === userId) || null,
+      };
+      comments.push(comment);
+      lsSet(LS_COMMENTS, comments);
+      return comment;
+    }
+    throw e;
+  }
+}
+
+export async function getCommentCount(achievementId: string): Promise<number> {
+  if (!isSupabaseConfigured()) {
+    const comments = lsGet<any[]>(LS_COMMENTS, []);
+    return comments.filter(c => c.achievement_id === achievementId).length;
+  }
+  
+  try {
+    const { count, error } = await supabase
+      .from('comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('achievement_id', achievementId);
+    
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const comments = lsGet<any[]>(LS_COMMENTS, []);
+        return comments.filter(c => c.achievement_id === achievementId).length;
+      }
+      throw error;
+    }
+    return count || 0;
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const comments = lsGet<any[]>(LS_COMMENTS, []);
+      return comments.filter(c => c.achievement_id === achievementId).length;
+    }
+    throw e;
+  }
 }
 
 export async function getComments(achievementId: string) {
-  const { data, error } = await supabase
-    .from('comments')
-    .select('*, user_profiles(*)')
-    .eq('achievement_id', achievementId)
-    .order('created_at', { ascending: false });
+  if (!isSupabaseConfigured()) {
+    const comments = lsGet<any[]>(LS_COMMENTS, []);
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    return comments
+      .filter(c => c.achievement_id === achievementId)
+      .map(c => ({
+        ...c,
+        user_profiles: users.find(u => u.id === c.user_id) || null,
+      }))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
   
-  if (error) throw error;
-  return data || [];
+  try {
+    // Comments table references user_profiles, not users
+    let { data, error } = await supabase
+      .from('comments')
+      .select('*, user_profiles(*)')
+      .eq('achievement_id', achievementId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const comments = lsGet<any[]>(LS_COMMENTS, []);
+        const users = lsGet<UserProfile[]>(LS_USERS, []);
+        return comments
+          .filter(c => c.achievement_id === achievementId)
+          .map(c => ({
+            ...c,
+            user_profiles: users.find(u => u.id === c.user_id) || null,
+          }))
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      }
+      throw error;
+    }
+    // Transform the data to ensure user_profiles is correctly mapped
+    return (data || []).map((comment: any) => ({
+      ...comment,
+      user_profiles: Array.isArray(comment.user_profiles) 
+        ? comment.user_profiles[0] 
+        : comment.user_profiles || null,
+    }));
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const comments = lsGet<any[]>(LS_COMMENTS, []);
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      return comments
+        .filter(c => c.achievement_id === achievementId)
+        .map(c => ({
+          ...c,
+          user_profiles: users.find(u => u.id === c.user_id) || null,
+        }))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+    throw e;
+  }
 }
 
-// Reactions API
+// Reactions/Likes API - Updated to reference 'achievements' table directly
 export async function toggleReaction(achievementId: string, userId: string, reactionType = 'like') {
-  // Check if reaction exists
-  const { data: existing } = await supabase
-    .from('reactions')
-    .select('*')
-    .eq('achievement_id', achievementId)
-    .eq('user_id', userId)
-    .single();
-
-  if (existing) {
-    // Delete reaction
-    const { error } = await supabase
-      .from('reactions')
-      .delete()
-      .eq('id', existing.id);
-    if (error) throw error;
-    return null;
-  } else {
-    // Create reaction
-    const { data, error } = await supabase
-      .from('reactions')
-      .insert({
+  if (!isSupabaseConfigured()) {
+    const reactions = lsGet<any[]>(LS_REACTIONS, []);
+    const existingIndex = reactions.findIndex(
+      r => r.achievement_id === achievementId && r.user_id === userId
+    );
+    
+    if (existingIndex !== -1) {
+      // Delete reaction
+      reactions.splice(existingIndex, 1);
+      lsSet(LS_REACTIONS, reactions);
+      return null;
+    } else {
+      // Create reaction
+      const now = new Date().toISOString();
+      const reaction = {
+        id: uuid(),
         achievement_id: achievementId,
         user_id: userId,
-        reaction_type: reactionType,
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+        created_at: now,
+      };
+      reactions.push(reaction);
+      lsSet(LS_REACTIONS, reactions);
+      return reaction;
+    }
+  }
+  
+  try {
+    // Likes table now references user_profiles(id) directly
+    // Check if like exists using user_profiles.id
+    let { data: existing, error: checkError } = await supabase
+      .from('likes')
+      .select('*')
+      .eq('achievement_id', achievementId)
+      .eq('user_id', userId) // userId is already user_profiles.id
+      .maybeSingle();
+
+    // If achievement_id column doesn't exist, the table might not have been migrated yet
+    // In that case, we'll need to check what columns actually exist
+    if (checkError && (checkError.code === '42703' || checkError.message?.includes('column "achievement_id" does not exist'))) {
+      // Try to get all likes for this user to see the structure
+      const { data: allLikes } = await supabase
+        .from('likes')
+        .select('*')
+        .eq('user_id', userId)
+        .limit(1);
+      
+      // If we got data, check what column name is used
+      if (allLikes && allLikes.length > 0) {
+        const firstLike = allLikes[0];
+        // Check if it has post_id or achievement_id
+        const columnName = firstLike.achievement_id !== undefined ? 'achievement_id' : 
+                          firstLike.post_id !== undefined ? 'post_id' : null;
+        
+        if (columnName) {
+          const { data: existingWithColumn, error: columnError } = await supabase
+            .from('likes')
+            .select('*')
+            .eq(columnName, achievementId)
+            .eq('user_id', userId)
+            .maybeSingle();
+          
+          if (!columnError) {
+            existing = existingWithColumn;
+            checkError = null;
+          }
+        }
+      }
+    }
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      if (shouldMockOnError(checkError)) {
+        const reactions = lsGet<any[]>(LS_REACTIONS, []);
+        const existingIndex = reactions.findIndex(
+          r => r.achievement_id === achievementId && r.user_id === userId
+        );
+        
+        if (existingIndex !== -1) {
+          reactions.splice(existingIndex, 1);
+          lsSet(LS_REACTIONS, reactions);
+          return null;
+        } else {
+          const now = new Date().toISOString();
+          const reaction = {
+            id: uuid(),
+            achievement_id: achievementId,
+            user_id: userId,
+            created_at: now,
+          };
+          reactions.push(reaction);
+          lsSet(LS_REACTIONS, reactions);
+          return reaction;
+        }
+      }
+      throw checkError;
+    }
+
+    if (existing) {
+      // Delete like
+      const { error } = await supabase
+        .from('likes')
+        .delete()
+        .eq('id', existing.id);
+      if (error) {
+        if (shouldMockOnError(error)) {
+          const reactions = lsGet<any[]>(LS_REACTIONS, []);
+          const existingIndex = reactions.findIndex(
+            r => r.achievement_id === achievementId && r.user_id === userId
+          );
+          if (existingIndex !== -1) {
+            reactions.splice(existingIndex, 1);
+            lsSet(LS_REACTIONS, reactions);
+          }
+          return null;
+        }
+        throw error;
+      }
+      return null;
+    } else {
+      // Create like using user_profiles.id
+      let insertData: any = {
+        user_id: userId, // userId is user_profiles.id
+        achievement_id: achievementId,
+      };
+      
+      let { data, error } = await supabase
+        .from('likes')
+        .insert(insertData)
+        .select()
+        .single();
+      
+      // If achievement_id column doesn't exist, fall back to mock storage
+      if (error && (error.code === '42703' || (error.message?.includes('column') && error.message?.includes('does not exist')))) {
+        console.warn('Likes table missing achievement_id column. Using localStorage fallback. Please run migration SQL.');
+        // Fall back to localStorage
+        if (shouldMockOnError(error)) {
+          const reactions = lsGet<any[]>(LS_REACTIONS, []);
+          const now = new Date().toISOString();
+          const reaction = {
+            id: uuid(),
+            achievement_id: achievementId,
+            user_id: userId,
+            created_at: now,
+          };
+          reactions.push(reaction);
+          lsSet(LS_REACTIONS, reactions);
+          return reaction;
+        }
+        throw new Error('Please run the migration SQL to add achievement_id column to likes table. See: supabase/migrations/fix_likes_comments_schema.sql');
+      }
+      
+      if (error) {
+        if (shouldMockOnError(error)) {
+          const reactions = lsGet<any[]>(LS_REACTIONS, []);
+          const now = new Date().toISOString();
+          const reaction = {
+            id: uuid(),
+            achievement_id: achievementId,
+            user_id: userId,
+            created_at: now,
+          };
+          reactions.push(reaction);
+          lsSet(LS_REACTIONS, reactions);
+          return reaction;
+        }
+        throw error;
+      }
+      return data;
+    }
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const reactions = lsGet<any[]>(LS_REACTIONS, []);
+      const existingIndex = reactions.findIndex(
+        r => r.achievement_id === achievementId && r.user_id === userId
+      );
+      
+      if (existingIndex !== -1) {
+        reactions.splice(existingIndex, 1);
+        lsSet(LS_REACTIONS, reactions);
+        return null;
+      } else {
+        const now = new Date().toISOString();
+        const reaction = {
+          id: uuid(),
+          achievement_id: achievementId,
+          user_id: userId,
+          created_at: now,
+        };
+        reactions.push(reaction);
+        lsSet(LS_REACTIONS, reactions);
+        return reaction;
+      }
+    }
+    throw e;
   }
 }
 
 export async function getReactions(achievementId: string) {
-  const { data, error } = await supabase
-    .from('reactions')
-    .select('*, user_profiles(*)')
-    .eq('achievement_id', achievementId);
+  if (!isSupabaseConfigured()) {
+    const reactions = lsGet<any[]>(LS_REACTIONS, []);
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    return reactions
+      .filter(r => r.achievement_id === achievementId)
+      .map(r => ({
+        ...r,
+        user_profiles: users.find(u => u.id === r.user_id) || null,
+      }));
+  }
   
-  if (error) throw error;
-  return data || [];
+  try {
+    // Likes table now references user_profiles(id) directly
+    // Get likes with user_profiles joined
+    let { data, error } = await supabase
+      .from('likes')
+      .select('*, user_profiles(*)')
+      .eq('achievement_id', achievementId);
+    
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const reactions = lsGet<any[]>(LS_REACTIONS, []);
+        const users = lsGet<UserProfile[]>(LS_USERS, []);
+        return reactions
+          .filter(r => r.achievement_id === achievementId)
+          .map(r => ({
+            ...r,
+            user_profiles: users.find(u => u.id === r.user_id) || null,
+          }));
+      }
+      throw error;
+    }
+    
+    // Transform the data to ensure user_profiles is correctly mapped
+    if (data) {
+      return data.map((like: any) => ({
+        ...like,
+        user_profiles: Array.isArray(like.user_profiles) 
+          ? like.user_profiles[0] 
+          : like.user_profiles || null,
+      }));
+    }
+    
+    return data || [];
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const reactions = lsGet<any[]>(LS_REACTIONS, []);
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      return reactions
+        .filter(r => r.achievement_id === achievementId)
+        .map(r => ({
+          ...r,
+          user_profiles: users.find(u => u.id === r.user_id) || null,
+        }));
+    }
+    throw e;
+  }
 }
 
 // ========== EVENT MANAGEMENT API ==========
@@ -1233,13 +1724,17 @@ export async function getPendingOrganizerApplications(): Promise<UserProfile[]> 
  */
 export async function followUser(followerId: string, followedId: string): Promise<Follower> {
   if (!isSupabaseConfigured()) {
+    const followers = lsGet<any[]>(LS_FOLLOWERS, []);
     const now = new Date().toISOString();
-    return {
+    const follower = {
       id: uuid(),
       follower_id: followerId,
       followed_id: followedId,
       followed_at: now,
     };
+    followers.push(follower);
+    lsSet(LS_FOLLOWERS, followers);
+    return follower;
   }
   try {
     const { data, error } = await supabase
@@ -1250,9 +1745,37 @@ export async function followUser(followerId: string, followedId: string): Promis
       })
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+        const now = new Date().toISOString();
+        const follower = {
+          id: uuid(),
+          follower_id: followerId,
+          followed_id: followedId,
+          followed_at: now,
+        };
+        followers.push(follower);
+        lsSet(LS_FOLLOWERS, followers);
+        return follower;
+      }
+      throw error;
+    }
     return data;
   } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+      const now = new Date().toISOString();
+      const follower = {
+        id: uuid(),
+        follower_id: followerId,
+        followed_id: followedId,
+        followed_at: now,
+      };
+      followers.push(follower);
+      lsSet(LS_FOLLOWERS, followers);
+      return follower;
+    }
     throw e;
   }
 }
@@ -1262,6 +1785,14 @@ export async function followUser(followerId: string, followedId: string): Promis
  */
 export async function unfollowUser(followerId: string, followedId: string): Promise<void> {
   if (!isSupabaseConfigured()) {
+    const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+    const index = followers.findIndex(
+      f => f.follower_id === followerId && f.followed_id === followedId
+    );
+    if (index !== -1) {
+      followers.splice(index, 1);
+      lsSet(LS_FOLLOWERS, followers);
+    }
     return;
   }
   try {
@@ -1270,8 +1801,32 @@ export async function unfollowUser(followerId: string, followedId: string): Prom
       .delete()
       .eq('follower_id', followerId)
       .eq('followed_id', followedId);
-    if (error) throw error;
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+        const index = followers.findIndex(
+          f => f.follower_id === followerId && f.followed_id === followedId
+        );
+        if (index !== -1) {
+          followers.splice(index, 1);
+          lsSet(LS_FOLLOWERS, followers);
+        }
+        return;
+      }
+      throw error;
+    }
   } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+      const index = followers.findIndex(
+        f => f.follower_id === followerId && f.followed_id === followedId
+      );
+      if (index !== -1) {
+        followers.splice(index, 1);
+        lsSet(LS_FOLLOWERS, followers);
+      }
+      return;
+    }
     throw e;
   }
 }
@@ -1281,7 +1836,15 @@ export async function unfollowUser(followerId: string, followedId: string): Prom
  */
 export async function getFollowers(userId: string): Promise<Follower[]> {
   if (!isSupabaseConfigured()) {
-    return [];
+    const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    return followers
+      .filter(f => f.followed_id === userId)
+      .map(f => ({
+        ...f,
+        follower: users.find(u => u.id === f.follower_id) || null,
+      }))
+      .sort((a, b) => new Date(b.followed_at).getTime() - new Date(a.followed_at).getTime());
   }
   try {
     const { data, error } = await supabase
@@ -1289,9 +1852,33 @@ export async function getFollowers(userId: string): Promise<Follower[]> {
       .select('*, follower:user_profiles!followers_follower_id_fkey(*)')
       .eq('followed_id', userId)
       .order('followed_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+        const users = lsGet<UserProfile[]>(LS_USERS, []);
+        return followers
+          .filter(f => f.followed_id === userId)
+          .map(f => ({
+            ...f,
+            follower: users.find(u => u.id === f.follower_id) || null,
+          }))
+          .sort((a, b) => new Date(b.followed_at).getTime() - new Date(a.followed_at).getTime());
+      }
+      throw error;
+    }
     return data || [];
   } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      return followers
+        .filter(f => f.followed_id === userId)
+        .map(f => ({
+          ...f,
+          follower: users.find(u => u.id === f.follower_id) || null,
+        }))
+        .sort((a, b) => new Date(b.followed_at).getTime() - new Date(a.followed_at).getTime());
+    }
     throw e;
   }
 }
@@ -1301,7 +1888,15 @@ export async function getFollowers(userId: string): Promise<Follower[]> {
  */
 export async function getFollowing(userId: string): Promise<Follower[]> {
   if (!isSupabaseConfigured()) {
-    return [];
+    const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    return followers
+      .filter(f => f.follower_id === userId)
+      .map(f => ({
+        ...f,
+        followed: users.find(u => u.id === f.followed_id) || null,
+      }))
+      .sort((a, b) => new Date(b.followed_at).getTime() - new Date(a.followed_at).getTime());
   }
   try {
     const { data, error } = await supabase
@@ -1309,9 +1904,33 @@ export async function getFollowing(userId: string): Promise<Follower[]> {
       .select('*, followed:user_profiles!followers_followed_id_fkey(*)')
       .eq('follower_id', userId)
       .order('followed_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+        const users = lsGet<UserProfile[]>(LS_USERS, []);
+        return followers
+          .filter(f => f.follower_id === userId)
+          .map(f => ({
+            ...f,
+            followed: users.find(u => u.id === f.followed_id) || null,
+          }))
+          .sort((a, b) => new Date(b.followed_at).getTime() - new Date(a.followed_at).getTime());
+      }
+      throw error;
+    }
     return data || [];
   } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      return followers
+        .filter(f => f.follower_id === userId)
+        .map(f => ({
+          ...f,
+          followed: users.find(u => u.id === f.followed_id) || null,
+        }))
+        .sort((a, b) => new Date(b.followed_at).getTime() - new Date(a.followed_at).getTime());
+    }
     throw e;
   }
 }
@@ -1321,7 +1940,10 @@ export async function getFollowing(userId: string): Promise<Follower[]> {
  */
 export async function isFollowing(followerId: string, followedId: string): Promise<boolean> {
   if (!isSupabaseConfigured()) {
-    return false;
+    const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+    return followers.some(
+      f => f.follower_id === followerId && f.followed_id === followedId
+    );
   }
   try {
     const { data, error } = await supabase
@@ -1330,9 +1952,23 @@ export async function isFollowing(followerId: string, followedId: string): Promi
       .eq('follower_id', followerId)
       .eq('followed_id', followedId)
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+        return followers.some(
+          f => f.follower_id === followerId && f.followed_id === followedId
+        );
+      }
+      throw error;
+    }
     return !!data;
   } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const followers = lsGet<any[]>(LS_FOLLOWERS, []);
+      return followers.some(
+        f => f.follower_id === followerId && f.followed_id === followedId
+      );
+    }
     throw e;
   }
 }
@@ -1346,31 +1982,24 @@ export async function getMutualFollowers(userId: string): Promise<UserProfile[]>
   }
   try {
     // Get users that both follow each other
-    const { data, error } = await supabase
-      .rpc('get_mutual_followers', { user_id: userId });
+    // Use manual query since RPC function may not exist
+    const following = await getFollowing(userId);
+    const followers = await getFollowers(userId);
     
-    if (error) {
-      // Fallback: manual query
-      const { data: following } = await getFollowing(userId);
-      const { data: followers } = await getFollowers(userId);
-      
-      const followingIds = new Set(following.map(f => f.followed_id));
-      const mutualIds = followers
-        .filter(f => followingIds.has(f.follower_id))
-        .map(f => f.follower_id);
-      
-      if (mutualIds.length === 0) return [];
-      
-      const { data: users, error: usersError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .in('id', mutualIds);
-      
-      if (usersError) throw usersError;
-      return users || [];
-    }
+    const followingIds = new Set((following || []).map(f => f.followed_id));
+    const mutualIds = (followers || [])
+      .filter(f => followingIds.has(f.follower_id))
+      .map(f => f.follower_id);
     
-    return data || [];
+    if (mutualIds.length === 0) return [];
+    
+    const { data: users, error: usersError } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .in('id', mutualIds);
+    
+    if (usersError) throw usersError;
+    return users || [];
   } catch (e: any) {
     throw e;
   }

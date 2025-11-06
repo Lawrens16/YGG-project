@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFeedAchievements, getAllEvents, getMutualFollowers } from '@/lib/api';
+import { getFeedAchievements, getAllEvents, getFollowing } from '@/lib/api';
 import { FeedPost } from '@/components/FeedPost';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus } from 'lucide-react';
@@ -32,10 +32,10 @@ export function Feed() {
     if (!user) return;
     setLoading(true);
     try {
-      const mutualFriends = await getMutualFollowers(user.id);
-      setHasFriends(mutualFriends.length > 0);
+      const following = await getFollowing(user.id);
+      setHasFriends(following.length > 0);
     } catch (error) {
-      console.error('Error checking friends:', error);
+      console.error('Error checking following:', error);
       setHasFriends(false);
     } finally {
       setLoading(false);

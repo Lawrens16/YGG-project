@@ -1,14 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Avatar } from './ui/avatar';
-import { Input } from './ui/input';
-import { Heart, MessageCircle, Share2, MoreHorizontal, MapPin, Calendar, Award } from 'lucide-react';
+import { Share2, MoreHorizontal, MapPin, Calendar, Award } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Achievement, Event } from '@/types';
-import { toggleReaction, addComment, getComments, getReactions } from '@/lib/api';
+import { AchievementActions } from './AchievementActions';
 
 interface FeedPostProps {
   achievement?: Achievement;
@@ -17,82 +14,8 @@ interface FeedPostProps {
 }
 
 export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const [showComments, setShowComments] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
-  const [reactions, setReactions] = useState<any[]>([]);
-  const [commentText, setCommentText] = useState('');
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [loadingReaction, setLoadingReaction] = useState(false);
-
   const postUser = achievement?.user_profiles || event?.user_profiles;
-  const postId = achievement?.id || event?.id;
-  const isLiked = reactions.some(r => r.user_id === user?.id);
-  const likeCount = reactions.length;
-
-  const loadComments = async () => {
-    if (!achievement || loadingComments) return;
-    setLoadingComments(true);
-    try {
-      const data = await getComments(achievement.id);
-      setComments(data);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    } finally {
-      setLoadingComments(false);
-    }
-  };
-
-  const loadReactions = async () => {
-    if (!achievement) return;
-    try {
-      const data = await getReactions(achievement.id);
-      setReactions(data);
-    } catch (error) {
-      console.error('Error loading reactions:', error);
-    }
-  };
-
-  const handleLike = async () => {
-    if (!achievement || !user || loadingReaction) return;
-    setLoadingReaction(true);
-    try {
-      await toggleReaction(achievement.id, user.id);
-      await loadReactions();
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      console.error('Error toggling reaction:', error);
-    } finally {
-      setLoadingReaction(false);
-    }
-  };
-
-  const handleComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!achievement || !user || !commentText.trim()) return;
-    try {
-      await addComment(achievement.id, user.id, commentText);
-      setCommentText('');
-      await loadComments();
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      console.error('Error adding comment:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (achievement) {
-      loadReactions();
-    }
-  }, [achievement]);
-
-  const toggleComments = () => {
-    if (!showComments && achievement) {
-      loadComments();
-    }
-    setShowComments(!showComments);
-  };
 
   if (event) {
     return (
@@ -211,77 +134,7 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 py-2 border-t border-b text-gray-600">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLike}
-            disabled={loadingReaction}
-            className={isLiked ? 'text-[#ff3800]' : ''}
-          >
-            <Heart className={`h-5 w-5 mr-1 ${isLiked ? 'fill-current' : ''}`} />
-            {likeCount > 0 && <span>{likeCount}</span>}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleComments}
-          >
-            <MessageCircle className="h-5 w-5 mr-1" />
-            {comments.length > 0 && <span>{comments.length}</span>}
-          </Button>
-          <Button variant="ghost" size="sm">
-            <Share2 className="h-5 w-5 mr-1" />
-            Share
-          </Button>
-        </div>
-
-        {showComments && (
-          <div className="mt-3 space-y-3">
-            {loadingComments ? (
-              <div className="text-center py-4 text-gray-500">Loading comments...</div>
-            ) : (
-              <>
-                {comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-2">
-                    <Avatar
-                      src={comment.user_profiles?.avatar_url || undefined}
-                      alt={comment.user_profiles?.display_name || 'User'}
-                      className="h-8 w-8"
-                    />
-                    <div className="flex-1">
-                      <div className="bg-gray-100 rounded-lg p-2">
-                        <div className="font-semibold text-sm">
-                          {comment.user_profiles?.display_name || 'User'}
-                        </div>
-                        <div className="text-sm">{comment.content}</div>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1 ml-2">
-                        {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <form onSubmit={handleComment} className="flex gap-2">
-                  <Avatar
-                    src={user?.avatar_url || undefined}
-                    alt={user?.display_name || 'You'}
-                    className="h-8 w-8"
-                  />
-                  <Input
-                    placeholder="Write a comment..."
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button type="submit" size="sm" disabled={!commentText.trim()}>
-                    Post
-                  </Button>
-                </form>
-              </>
-            )}
-          </div>
-        )}
+        {achievement && <AchievementActions achievement={achievement} onUpdate={onUpdate} />}
       </div>
     </Card>
   );
