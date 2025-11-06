@@ -1,9 +1,8 @@
-// Lightweight placeholder to avoid bundling Sui SDK at build time.
-// Replace with real Sui client wiring once SDK/version is set up.
+import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { TransactionBlock } from '@mysten/sui.js/transactions';
+
 const network = import.meta.env.VITE_SUI_NETWORK || 'testnet';
-export const suiClient = {
-  network,
-};
+export const suiClient = new SuiClient({ url: getFullnodeUrl(network as any) });
 
 export const PACKAGE_ID = import.meta.env.VITE_SUI_PACKAGE_ID || '0x0';
 
@@ -135,5 +134,57 @@ export async function signTransaction(txBytes: Uint8Array) {
     return result;
   }
   throw new Error('Slush Wallet not found');
+}
+
+export type MintCertificateArgs = {
+  owner: string;
+  category: string;
+  title: string;
+  description: string;
+  proofHash: Uint8Array; // 32 bytes preferred
+  gpsData: string; // "lat,lng" text
+};
+
+/**
+ * Build a transaction to call achievement::mint_achievement and submit via Wallet Standard.
+ * Returns the transaction digest and created object id if available.
+ */
+export async function mintCertificate(args: MintCertificateArgs): Promise<{ digest: string; created?: string }> {
+  const pkg = PACKAGE_ID;
+  if (!pkg || pkg === '0x0') throw new Error('VITE_SUI_PACKAGE_ID is not set');
+
+  const txb = new TransactionBlock();
+  const enc = new TextEncoder();
+  txb.moveCall({
+    target: `${pkg}::achievement::mint_achievement`,
+    arguments: [
+      txb.pure(args.owner),
+      txb.pure(Array.from(enc.encode(args.category))),
+      txb.pure(Array.from(enc.encode(args.title))),
+      txb.pure(Array.from(enc.encode(args.description))),
+      txb.pure(Array.from(args.proofHash)),
+      txb.pure(Array.from(enc.encode(args.gpsData))),
+    ],
+  });
+
+  const wallet: any = (typeof window !== 'undefined') ? (window as any).suiWallet || (window as any).slush || (window as any).wallet : null;
+  if (!wallet || typeof wallet.request !== 'function') {
+    throw new Error('Sui-compatible wallet not found');
+  }
+
+  const res = await wallet.request({
+    method: 'sui_signAndExecuteTransactionBlock',
+    params: [{ transactionBlock: txb.serialize(), options: { showEffects: true, showObjectChanges: true } }],
+  });
+
+  const digest: string = res?.digest || res?.effectsCert?.effects?.transactionDigest || res?.effects?.transactionDigest;
+  let created: string | undefined;
+  const objectChanges: any[] = res?.objectChanges || res?.effects?.created || [];
+  if (Array.isArray(objectChanges)) {
+    // Wallet-std returns objectChanges entries with type 'created'
+    const createdChange = objectChanges.find((c: any) => (c?.type === 'created' && c?.objectType?.includes('achievement::Achievement')) || c?.reference?.objectId);
+    created = createdChange?.objectId || createdChange?.reference?.objectId;
+  }
+  return { digest, created };
 }
 

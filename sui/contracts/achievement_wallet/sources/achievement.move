@@ -20,6 +20,57 @@ module achievement_wallet::achievement {
         sui_transaction_id: vector<u8>,
     }
 
+    /// Mint and immediately verify a certificate (requires VerifierCap)
+    public entry fun mint_certificate(
+        verifier_cap: &VerifierCap,
+        owner: address,
+        category: vector<u8>,
+        title: vector<u8>,
+        description: vector<u8>,
+        proof_hash: vector<u8>,
+        gps_data: vector<u8>,
+        ctx: &mut TxContext
+    ) {
+        // Silence unused warning to assert possession of cap
+        let _cap_id = object::id(verifier_cap);
+
+        let category_string = string::utf8(category);
+        let title_string = string::utf8(title);
+        let description_string = string::utf8(description);
+        let gps_string = string::utf8(gps_data);
+        let timestamp = tx_context::epoch_timestamp_ms(ctx);
+        let sender = tx_context::sender(ctx);
+
+        let achievement = Achievement {
+            id: object::new(ctx),
+            owner,
+            verifier: sender,
+            category: category_string,
+            title: title_string,
+            description: description_string,
+            proof_hash,
+            timestamp,
+            gps_data: gps_string,
+            verified: true,
+            sui_transaction_id: tx_context::tx_hash(ctx),
+        };
+
+        let achievement_id = object::id(&achievement);
+        transfer::transfer(achievement, owner);
+
+        event::emit(AchievementCreated {
+            achievement_id,
+            owner,
+            category: category_string,
+            timestamp,
+        });
+        event::emit(AchievementVerified {
+            achievement_id,
+            verifier: sender,
+            timestamp,
+        });
+    }
+
     /// Capability for verified organizers to mint achievements
     struct VerifierCap has key, store {
         id: UID,

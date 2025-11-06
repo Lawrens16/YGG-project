@@ -376,7 +376,7 @@ export async function getAchievements(filters?: {
   }
 }
 
-export async function verifyAchievement(achievementId: string, verifierAddress: string, suiTxId?: string) {
+export async function verifyAchievement(achievementId: string, verifierAddress: string, suiTxId?: string, suiObjectId?: string) {
   if (!isSupabaseConfigured()) {
     const list = lsGet<Achievement[]>(LS_ACHIEVEMENTS, []);
     const idx = list.findIndex((a) => a.id === achievementId);
@@ -387,6 +387,7 @@ export async function verifyAchievement(achievementId: string, verifierAddress: 
       verified_at: new Date().toISOString(),
       verifier_address: verifierAddress,
       sui_transaction_id: suiTxId || null,
+      sui_object_id: suiObjectId || list[idx].sui_object_id || null,
       points_awarded: 10,
       updated_at: new Date().toISOString(),
     };
@@ -408,6 +409,7 @@ export async function verifyAchievement(achievementId: string, verifierAddress: 
         verified_at: new Date().toISOString(),
         verifier_address: verifierAddress,
         sui_transaction_id: suiTxId,
+        sui_object_id: suiObjectId,
         points_awarded: 10, // Award points for verification
       })
       .eq('id', achievementId)
@@ -424,6 +426,7 @@ export async function verifyAchievement(achievementId: string, verifierAddress: 
           verified_at: new Date().toISOString(),
           verifier_address: verifierAddress,
           sui_transaction_id: suiTxId || null,
+          sui_object_id: suiObjectId || list[idx].sui_object_id || null,
           points_awarded: 10,
           updated_at: new Date().toISOString(),
         };
@@ -459,6 +462,7 @@ export async function verifyAchievement(achievementId: string, verifierAddress: 
         verified_at: new Date().toISOString(),
         verifier_address: verifierAddress,
         sui_transaction_id: suiTxId || null,
+        sui_object_id: suiObjectId || list[idx].sui_object_id || null,
         points_awarded: 10,
         updated_at: new Date().toISOString(),
       };

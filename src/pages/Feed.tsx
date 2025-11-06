@@ -5,11 +5,13 @@ import { AchievementCard } from '@/components/AchievementCard';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import type { Achievement } from '@/types';
+import { getDailyTasks } from '@/lib/tasks';
 
 export function Feed() {
   const { user } = useAuth();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
+  const tasks = getDailyTasks();
 
   useEffect(() => {
     if (user) {
@@ -49,6 +51,14 @@ export function Feed() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      <div className="mb-6 p-4 rounded-xl bg-white border border-gray-200">
+        <h2 className="text-lg font-semibold mb-2">Today's Tasks</h2>
+        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
+          {tasks.map((t) => (
+            <li key={t.id}><span className="font-medium">{t.title}</span> — {t.description}</li>
+          ))}
+        </ul>
+      </div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Activity Feed</h1>
         <Button variant="outline" size="sm" onClick={loadFeed}>
