@@ -1,57 +1,197 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Heart, MessageCircle, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
-import { toggleReaction } from '@/lib/api';
+import { toggleReaction, getReactions, addComment, getComments, getCommentCount } from '@/lib/api';
 import { motion } from 'framer-motion';
+import { formatDistanceToNow } from 'date-fns';
 import type { Achievement } from '@/types';
 
 interface AchievementActionsProps {
   achievement: Achievement;
+  onUpdate?: () => void;
 }
 
-export function AchievementActions({ achievement }: AchievementActionsProps) {
+export function AchievementActions({ achievement, onUpdate }: AchievementActionsProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [loadingReaction, setLoadingReaction] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentCount, setCommentCount] = useState(0);
+  const [commentText, setCommentText] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
 
-  const handleLike = async () => {
-    if (!user) return;
+  // Load reactions and comment count on mount
+  useEffect(() => {
+    loadReactions();
+    loadCommentCount();
+  }, [achievement.id]);
+
+  const loadReactions = async () => {
     try {
-      await toggleReaction(achievement.id, user.id);
-      setLiked(!liked);
-      setLikeCount(liked ? likeCount - 1 : likeCount + 1);
+      const data = await getReactions(achievement.id);
+      setLikeCount(data?.length || 0);
+      const isLikedByUser = data?.some((r: any) => r.user_id === user?.id) || false;
+      setLiked(isLikedByUser);
     } catch (error) {
-      console.error('Error toggling reaction:', error);
+      console.error('Error loading reactions:', error);
     }
   };
 
+  const loadCommentCount = async () => {
+    try {
+      const count = await getCommentCount(achievement.id);
+      setCommentCount(count);
+    } catch (error) {
+      console.error('Error loading comment count:', error);
+    }
+  };
+
+  const loadComments = async () => {
+    if (loadingComments) return;
+    setLoadingComments(true);
+    try {
+      const data = await getComments(achievement.id);
+      setComments(data || []);
+      setCommentCount(data?.length || 0);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleLike = async () => {
+    if (!user || loadingReaction) return;
+    setLoadingReaction(true);
+    try {
+      console.log('Toggling like for achievement:', achievement.id, 'user:', user.id);
+      await toggleReaction(achievement.id, user.id);
+      // Reload reactions to get updated state
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await loadReactions();
+      if (onUpdate) onUpdate();
+    } catch (error) {
+      console.error('Error toggling reaction:', error);
+      alert(`Failed to like: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoadingReaction(false);
+    }
+  };
+
+  const handleComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !commentText.trim()) return;
+    
+    const submittingComment = commentText.trim();
+    setCommentText('');
+    
+    try {
+      console.log('Adding comment:', { achievementId: achievement.id, userId: user.id });
+      await addComment(achievement.id, user.id, submittingComment);
+      await loadComments();
+      await loadCommentCount();
+      if (onUpdate) onUpdate();
+    } catch (error: any) {
+      console.error('Error adding comment:', error);
+      setCommentText(submittingComment);
+      alert(`Failed to add comment: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const toggleComments = () => {
+    if (!showComments) {
+      loadComments();
+    }
+    setShowComments(!showComments);
+  };
+
   return (
-    <div className="flex items-center space-x-4 pt-4 border-t border-gray-200">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleLike}
-        className="flex items-center space-x-2"
-      >
-        <motion.div
-          animate={{ scale: liked ? 1.2 : 1 }}
-          transition={{ type: 'spring', stiffness: 500 }}
+    <div className="pt-4 border-t border-gray-200">
+      <div className="flex items-center space-x-4 mb-3">
+        <button
+          onClick={handleLike}
+          disabled={loadingReaction}
+          className="flex items-center space-x-2 hover:bg-gray-100 rounded-md px-2 py-1 transition-colors disabled:opacity-50"
+          type="button"
         >
-          <Heart className={`w-5 h-5 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
-        </motion.div>
-        <span>{likeCount}</span>
-      </Button>
+          <motion.div
+            animate={{ scale: liked ? 1.2 : 1 }}
+            transition={{ type: 'spring', stiffness: 500 }}
+          >
+            <Heart className={`w-5 h-5 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
+          </motion.div>
+          <span>{likeCount > 0 ? likeCount : ''}</span>
+        </button>
 
-      <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-        <MessageCircle className="w-5 h-5" />
-        <span>Comment</span>
-      </Button>
+        <button
+          onClick={toggleComments}
+          className="flex items-center space-x-2 hover:bg-gray-100 rounded-md px-2 py-1 transition-colors"
+          type="button"
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span>{commentCount > 0 ? commentCount : ''}</span>
+        </button>
 
-      <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-        <Share2 className="w-5 h-5" />
-        <span>Share</span>
-      </Button>
+        <button
+          className="flex items-center space-x-2 hover:bg-gray-100 rounded-md px-2 py-1 transition-colors"
+          type="button"
+        >
+          <Share2 className="w-5 h-5" />
+          <span>Share</span>
+        </button>
+      </div>
+
+      {showComments && (
+        <div className="mt-3 space-y-3">
+          {loadingComments ? (
+            <div className="text-center py-4 text-gray-500 text-sm">Loading comments...</div>
+          ) : (
+            <>
+              {comments.map((comment) => (
+                <div key={comment.id} className="flex gap-2">
+                  <Avatar
+                    src={comment.user_profiles?.avatar_url || undefined}
+                    alt={comment.user_profiles?.display_name || 'User'}
+                    className="h-8 w-8"
+                  />
+                  <div className="flex-1">
+                    <div className="bg-gray-100 rounded-lg p-2">
+                      <div className="font-semibold text-sm">
+                        {comment.user_profiles?.display_name || 'User'}
+                      </div>
+                      <div className="text-sm">{comment.content}</div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 ml-2">
+                      {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <form onSubmit={handleComment} className="flex gap-2">
+                <Avatar
+                  src={user?.avatar_url || undefined}
+                  alt={user?.display_name || 'You'}
+                  className="h-8 w-8"
+                />
+                <Input
+                  placeholder="Write a comment..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  className="flex-1"
+                />
+                <Button type="submit" size="sm" disabled={!commentText.trim()}>
+                  Post
+                </Button>
+              </form>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

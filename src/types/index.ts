@@ -3,13 +3,15 @@ export interface UserProfile {
   wallet_address: string;
   display_name: string | null;
   avatar_url: string | null;
+  banner_url: string | null;
   bio: string | null;
   school_name: string | null;
   course_name: string | null;
   privacy_level: 'private' | 'friends' | 'public';
   skill_points: number;
-  level: number;
   is_organizer: boolean;
+  is_admin: boolean;
+  organizer_application_status: 'pending' | 'approved' | 'rejected' | null;
   created_at: string;
   updated_at: string;
 }
@@ -17,6 +19,7 @@ export interface UserProfile {
 export interface Achievement {
   id: string;
   user_id: string;
+  event_id: string | null;
   category: 'academic' | 'leadership' | 'technology' | 'community' | 'sports' | 'arts';
   title: string;
   description: string | null;
@@ -35,6 +38,7 @@ export interface Achievement {
   created_at: string;
   updated_at: string;
   user_profiles?: UserProfile;
+  events?: Event;
 }
 
 export interface PeerTag {
@@ -51,13 +55,13 @@ export interface PeerTag {
   created_at: string;
 }
 
-export interface Friendship {
+export interface Follower {
   id: string;
-  requester_id: string;
-  addressee_id: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'blocked';
-  created_at: string;
-  updated_at: string;
+  follower_id: string;
+  followed_id: string;
+  followed_at: string;
+  follower?: UserProfile;
+  followed?: UserProfile;
 }
 
 export interface Comment {
@@ -82,11 +86,63 @@ export interface Reaction {
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'friend_request' | 'achievement_verified' | 'peer_tag' | 'comment' | 'reaction';
+  type: 'friend_request' | 'achievement_verified' | 'peer_tag' | 'comment' | 'reaction' | 'event_registration' | 'event_verified' | 'badge_issued' | 'organizer_approved' | 'organizer_rejected';
   reference_id: string | null;
   title: string;
   message: string | null;
   read: boolean;
   created_at: string;
+}
+
+export interface Event {
+  id: string;
+  organizer_id: string;
+  name: string;
+  description: string | null;
+  venue_address: string;
+  venue_latitude: number | null;
+  venue_longitude: number | null;
+  start_date: string;
+  end_date: string;
+  contact_info: string | null;
+  email: string | null;
+  capacity: number | null;
+  banner_url: string | null;
+  qr_code_url: string | null;
+  event_code: string;
+  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  created_at: string;
+  updated_at: string;
+  user_profiles?: UserProfile;
+}
+
+export interface EventRegistration {
+  id: string;
+  event_id: string;
+  user_id: string;
+  verification_status: 'registered' | 'verified' | 'rejected';
+  verification_photo_url: string | null;
+  verification_timestamp: string | null;
+  verification_gps_latitude: number | null;
+  verification_gps_longitude: number | null;
+  badge_issued: boolean;
+  sui_object_id: string | null;
+  created_at: string;
+  verified_at: string | null;
+  events?: Event;
+  user_profiles?: UserProfile;
+}
+
+export interface BadgeTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  metadata_uri: string | null;
+  image_url: string | null;
+  created_by: string | null;
+  is_active: boolean;
+  created_at: string;
+  user_profiles?: UserProfile;
 }
 

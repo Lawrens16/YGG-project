@@ -1,30 +1,70 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFeedAchievements } from '@/lib/api';
-import { AchievementCard } from '@/components/AchievementCard';
+import { getFeedAchievements, getAllEvents, getFollowing } from '@/lib/api';
+import { FeedPost } from '@/components/FeedPost';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
-import type { Achievement } from '@/types';
-import { getDailyTasks } from '@/lib/tasks';
+import { RefreshCw, UserPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import type { Achievement, Event } from '@/types';
 
 export function Feed() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const tasks = getDailyTasks();
+  const [hasFriends, setHasFriends] = useState(false);
+  const [feedItems, setFeedItems] = useState<Array<{ type: 'achievement' | 'event'; data: Achievement | Event }>>([]);
 
   useEffect(() => {
     if (user) {
-      loadFeed();
+      checkFriends();
     }
   }, [user]);
 
-  async function loadFeed() {
+  useEffect(() => {
+    if (user && hasFriends) {
+      loadFeed();
+    }
+  }, [user, hasFriends]);
+
+  async function checkFriends() {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await getFeedAchievements(user.id);
-      setAchievements(data as Achievement[]);
+      const following = await getFollowing(user.id);
+      setHasFriends(following.length > 0);
+    } catch (error) {
+      console.error('Error checking following:', error);
+      setHasFriends(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadFeed() {
+    if (!user || !hasFriends) return;
+    setLoading(true);
+    try {
+      const [achievementsData, eventsData] = await Promise.all([
+        getFeedAchievements(user.id),
+        getAllEvents({ status: 'upcoming', limit: 5 }),
+      ]);
+      
+      setAchievements(achievementsData as Achievement[]);
+      setEvents(eventsData);
+      
+      // Combine and sort by date (newest first)
+      const combined = [
+        ...(achievementsData as Achievement[]).map(a => ({ type: 'achievement' as const, data: a })),
+        ...eventsData.map(e => ({ type: 'event' as const, data: e })),
+      ].sort((a, b) => {
+        const dateA = new Date(a.data.created_at || a.data.start_date).getTime();
+        const dateB = new Date(b.data.created_at || b.data.start_date).getTime();
+        return dateB - dateA;
+      });
+      
+      setFeedItems(combined);
     } catch (error) {
       console.error('Error loading feed:', error);
     } finally {
@@ -43,42 +83,54 @@ export function Feed() {
   if (loading) {
     return (
       <div className="text-center py-20">
-        <RefreshCw className="w-8 h-8 animate-spin mx-auto text-blue-600" />
+        <RefreshCw className="w-8 h-8 animate-spin mx-auto text-[#ff3800]" />
         <p className="mt-4 text-gray-500">Loading feed...</p>
       </div>
     );
   }
 
-  return (
-    <div className="max-w-2xl mx-auto">
-      <div className="mb-6 p-4 rounded-xl bg-white border border-gray-200">
-        <h2 className="text-lg font-semibold mb-2">Today's Tasks</h2>
-        <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1">
-          {tasks.map((t) => (
-            <li key={t.id}><span className="font-medium">{t.title}</span> — {t.description}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Activity Feed</h1>
-        <Button variant="outline" size="sm" onClick={loadFeed}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
-
-      {achievements.length === 0 ? (
+  if (!hasFriends) {
+    return (
+      <div className="max-w-2xl mx-auto">
         <div className="text-center py-20 bg-white rounded-xl">
-          <p className="text-gray-500 mb-4">No achievements in your feed yet.</p>
-          <p className="text-sm text-gray-400">Connect with friends to see their verified achievements!</p>
+          <UserPlus className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+          <p className="text-xl font-semibold text-gray-900 mb-2">Your feed is empty</p>
+          <p className="text-gray-500 mb-6">Follow users to see their posts and achievements in your feed!</p>
+          <Button onClick={() => navigate('/events')}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Discover Users
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-4">
+      {feedItems.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-xl">
+          <p className="text-gray-500 mb-4">No posts yet.</p>
+          <p className="text-sm text-gray-400">Posts from your friends will appear here!</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {achievements.map((achievement) => (
-            <AchievementCard key={achievement.id} achievement={achievement} />
+        <div className="space-y-4">
+          {feedItems.map((item) => (
+            <FeedPost
+              key={item.data.id}
+              achievement={item.type === 'achievement' ? (item.data as Achievement) : undefined}
+              event={item.type === 'event' ? (item.data as Event) : undefined}
+              onUpdate={loadFeed}
+            />
           ))}
         </div>
       )}
+
+      <div className="text-center py-4">
+        <Button variant="outline" onClick={loadFeed} className="w-full">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh Feed
+        </Button>
+      </div>
     </div>
   );
 }
