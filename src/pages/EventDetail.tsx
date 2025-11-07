@@ -23,6 +23,7 @@ export function EventDetail() {
   const [showCamera, setShowCamera] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState<Achievement[]>([]);
+  const [allAttendanceRecords, setAllAttendanceRecords] = useState<Achievement[]>([]);
   const [showAttendanceUpload, setShowAttendanceUpload] = useState(false);
 
   useEffect(() => {
@@ -52,6 +53,13 @@ export function EventDetail() {
           const userAchievements = await getAchievements({ userId: user.id });
           const eventAttendance = userAchievements.filter(a => a.event_id === id);
           setAttendanceRecords(eventAttendance);
+        }
+        
+        // Load all attendance records for organizer
+        if (eventData.organizer_id === user.id) {
+          const allAchievements = await getAchievements({});
+          const eventAttendance = allAchievements.filter(a => a.event_id === id && a.image_url);
+          setAllAttendanceRecords(eventAttendance);
         }
       }
     } catch (error) {
@@ -229,6 +237,27 @@ export function EventDetail() {
               <Button onClick={handleIssueBadges} className="w-full">
                 Issue Badges to Verified Attendees
               </Button>
+            )}
+            {allAttendanceRecords.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Attendance Pictures ({allAttendanceRecords.length})</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+                  {allAttendanceRecords.map((record) => (
+                    <div key={record.id} className="relative">
+                      {record.image_url && (
+                        <img
+                          src={record.image_url}
+                          alt={`Attendance by ${record.user_profiles?.display_name || 'User'}`}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-lg">
+                        {record.user_profiles?.display_name || 'User'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </Card>

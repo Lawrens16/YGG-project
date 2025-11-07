@@ -167,8 +167,10 @@ export function OrganizerDashboard() {
                   placeholder="Start Date"
                   value={formData.start_date}
                   onChange={(e) => {
-                    setFormData({ ...formData, start_date: e.target.value });
-                    setValidationErrors({ ...validationErrors, start_date: undefined });
+                    const newStartDate = e.target.value;
+                    setFormData({ ...formData, start_date: newStartDate });
+                    // Clear validation errors when user types
+                    setValidationErrors({});
                   }}
                   min={new Date().toISOString().slice(0, 16)}
                   required
@@ -183,8 +185,10 @@ export function OrganizerDashboard() {
                   placeholder="End Date"
                   value={formData.end_date}
                   onChange={(e) => {
-                    setFormData({ ...formData, end_date: e.target.value });
-                    setValidationErrors({ ...validationErrors, end_date: undefined });
+                    const newEndDate = e.target.value;
+                    setFormData({ ...formData, end_date: newEndDate });
+                    // Clear validation errors when user types
+                    setValidationErrors({});
                   }}
                   min={formData.start_date || new Date().toISOString().slice(0, 16)}
                   required
@@ -212,9 +216,11 @@ export function OrganizerDashboard() {
               onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
             />
             <div className="flex gap-2">
+
               <Button 
                 type="submit"
-                disabled={Object.keys(validationErrors).length > 0}
+                disabled={!formData.name.trim() || !formData.start_date || !formData.end_date || Object.keys(validationErrors).length > 0}
+                className="bg-[#ff3800] hover:bg-[#ff5500]"
               >
                 Create Event
               </Button>

@@ -1,12 +1,15 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Avatar } from './ui/avatar';
-import { Share2, MoreHorizontal, MapPin, Calendar, Award } from 'lucide-react';
+import { Share2, MoreHorizontal, MapPin, Calendar, Award, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Achievement, Event } from '@/types';
 import { AchievementActions } from './AchievementActions';
 import { ShareButton } from './ShareButton';
+import { deleteAchievement } from '@/lib/api';
 
 interface FeedPostProps {
   achievement?: Achievement;
@@ -16,7 +19,25 @@ interface FeedPostProps {
 
 export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isDeleting, setIsDeleting] = useState(false);
   const postUser = achievement?.user_profiles || event?.user_profiles;
+  const isOwner = achievement && user && achievement.user_id === user.id;
+
+  const handleDelete = async () => {
+    if (!achievement || !user || !isOwner) return;
+    if (!confirm('Are you sure you want to delete this post?')) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteAchievement(achievement.id, user.id);
+      if (onUpdate) onUpdate();
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete post');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (event) {
     return (
@@ -108,9 +129,23 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {isOwner && (
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                title="Delete post"
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         <div className="mb-3">

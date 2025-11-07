@@ -78,14 +78,17 @@ export function ShareButton({ title, text, url, type }: ShareButtonProps) {
       <Button 
         variant="ghost" 
         size="sm"
-        onClick={() => setShowMenu(!showMenu)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowMenu(!showMenu);
+        }}
       >
         <Share2 className="h-4 w-4 mr-2" />
         Share
       </Button>
 
       {showMenu && (
-        <Card className="absolute right-0 top-full mt-2 w-48 z-50 p-2 shadow-lg">
+        <Card className="absolute right-0 top-full mt-2 w-48 z-[100] p-2 shadow-lg bg-white">
           <div className="space-y-1">
             {navigator.share && (
               <button

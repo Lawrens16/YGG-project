@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFeedAchievements, getAllEvents, getFollowing, getAchievements } from '@/lib/api';
+import { getFeedAchievements, getAllEvents, getFollowing, getAchievements, createAchievement } from '@/lib/api';
 import { FeedPost } from '@/components/FeedPost';
+import { CreatePost } from '@/components/CreatePost';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { Achievement, Event } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 export function Feed() {
   const { user } = useAuth();
@@ -82,6 +84,61 @@ export function Feed() {
     }
   }
 
+  const handleCreatePost = async (content: string, image?: File, eventId?: string) => {
+    if (!user) return;
+    
+    try {
+      let imageUrl: string | null = null;
+      
+      // Upload image if provided
+      if (image) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('achievement-photos')
+          .upload(fileName, image);
+
+        if (uploadError) {
+          // Try alternative bucket
+          const { data: altUploadData, error: altUploadError } = await supabase.storage
+            .from('verification-photos')
+            .upload(fileName, image);
+          
+          if (altUploadError) {
+            throw new Error('Failed to upload image');
+          }
+          
+          const { data: { publicUrl } } = supabase.storage
+            .from('verification-photos')
+            .getPublicUrl(fileName);
+          imageUrl = publicUrl;
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('achievement-photos')
+            .getPublicUrl(fileName);
+          imageUrl = publicUrl;
+        }
+      }
+
+      // Create achievement/post
+      await createAchievement({
+        user_id: user.id,
+        event_id: eventId || null,
+        category: 'community',
+        title: content || 'Shared a photo',
+        description: content || null,
+        image_url: imageUrl,
+        status: 'pending',
+      });
+
+      // Reload feed
+      await loadFeed();
+    } catch (error) {
+      console.error('Error creating post:', error);
+      alert('Failed to create post');
+    }
+  };
+
   if (!user) {
     return (
       <div className="text-center py-20">
@@ -117,6 +174,9 @@ export function Feed() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      {/* Create Post */}
+      <CreatePost onSubmit={handleCreatePost} />
+      
       {/* Filter Tabs */}
       <div className="flex gap-2 bg-white rounded-lg p-1 shadow-sm">
         <Button

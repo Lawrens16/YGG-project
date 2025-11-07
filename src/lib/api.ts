@@ -498,6 +498,53 @@ export async function verifyAchievement(achievementId: string, verifierAddress: 
   }
 }
 
+/**
+ * Delete an achievement (post) - only if user owns it
+ */
+export async function deleteAchievement(achievementId: string, userId: string): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    const list = lsGet<Achievement[]>(LS_ACHIEVEMENTS, []);
+    const idx = list.findIndex((a) => a.id === achievementId);
+    if (idx === -1) throw new Error('Achievement not found');
+    if (list[idx].user_id !== userId) throw new Error('Unauthorized: You can only delete your own posts');
+    list.splice(idx, 1);
+    lsSet(LS_ACHIEVEMENTS, list);
+    return;
+  }
+  try {
+    // First verify ownership
+    const { data: achievement, error: fetchError } = await supabase
+      .from('achievements')
+      .select('user_id')
+      .eq('id', achievementId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    if (!achievement || achievement.user_id !== userId) {
+      throw new Error('Unauthorized: You can only delete your own posts');
+    }
+    
+    // Delete the achievement
+    const { error } = await supabase
+      .from('achievements')
+      .delete()
+      .eq('id', achievementId);
+    
+    if (error) throw error;
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const list = lsGet<Achievement[]>(LS_ACHIEVEMENTS, []);
+      const idx = list.findIndex((a) => a.id === achievementId);
+      if (idx === -1) throw new Error('Achievement not found');
+      if (list[idx].user_id !== userId) throw new Error('Unauthorized: You can only delete your own posts');
+      list.splice(idx, 1);
+      lsSet(LS_ACHIEVEMENTS, list);
+      return;
+    }
+    throw e;
+  }
+}
+
 export async function getUserProfile(userId: string) {
   if (!isSupabaseConfigured()) {
     const users = lsGet<UserProfile[]>(LS_USERS, []);
