@@ -18,8 +18,12 @@ export function Landing() {
           transition={{ duration: 0.6 }}
           className="text-center"
         >
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#ff3800] to-[#ff5500] rounded-2xl mb-6 shadow-lg">
-            <Award className="w-10 h-10 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6">
+            <img 
+              src="/spotme.svg" 
+              alt="SpotMe" 
+              className="w-full h-full"
+            />
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">

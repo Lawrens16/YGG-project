@@ -222,6 +222,7 @@ export async function createAchievement(achievement: Partial<Achievement>) {
     const item: Achievement = {
       id: uuid(),
       user_id: achievement.user_id as string,
+      event_id: achievement.event_id || null,
       category: (achievement.category as any) || 'academic',
       title: achievement.title as string,
       description: achievement.description || null,

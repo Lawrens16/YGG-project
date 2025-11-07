@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { useState, useEffect, useRef } from 'react';
 import { searchUsers } from '@/lib/api';
 import type { UserProfile } from '@/types';
+import { InstallPrompt } from './InstallPrompt';
+import { OfflineIndicator } from './OfflineIndicator';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, disconnect } = useAuth();
@@ -66,13 +68,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white">
+      <OfflineIndicator />
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-4">
             <Link to="/feed" className="flex items-center space-x-2 flex-shrink-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#ff3800] to-[#ff5500] rounded-lg flex items-center justify-center">
-                <Award className="w-5 h-5 text-white" />
-              </div>
+              <img 
+                src="/spotme.svg" 
+                alt="SpotMe" 
+                className="w-8 h-8"
+              />
               <span className="font-bold text-xl text-gray-900">SpotMe</span>
             </Link>
             
@@ -202,6 +207,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      <InstallPrompt />
     </div>
   );
 }

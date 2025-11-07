@@ -6,6 +6,7 @@ import { Share2, MoreHorizontal, MapPin, Calendar, Award } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Achievement, Event } from '@/types';
 import { AchievementActions } from './AchievementActions';
+import { ShareButton } from './ShareButton';
 
 interface FeedPostProps {
   achievement?: Achievement;
@@ -74,10 +75,12 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
             >
               View Event
             </Button>
-            <Button variant="ghost" size="sm" className="flex-1">
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
+            <ShareButton
+              title={event.name}
+              text={`Join me at ${event.name}`}
+              url={`${window.location.origin}/events/${event.id}`}
+              type="event"
+            />
           </div>
         </div>
       </Card>
@@ -134,7 +137,15 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
           </div>
         </div>
 
-        {achievement && <AchievementActions achievement={achievement} onUpdate={onUpdate} />}
+        <div className="flex items-center justify-between pt-3 border-t">
+          {achievement && <AchievementActions achievement={achievement} onUpdate={onUpdate} />}
+          <ShareButton
+            title={achievement.title}
+            text={`Check out my achievement: ${achievement.title}`}
+            url={`${window.location.origin}/profile/${achievement.user_id}`}
+            type="achievement"
+          />
+        </div>
       </div>
     </Card>
   );

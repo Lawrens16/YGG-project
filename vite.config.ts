@@ -8,27 +8,30 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['spotme.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Achievement Wallet',
-        short_name: 'A-Wallet',
-        description: 'Social web platform for students to capture, verify, and showcase achievements',
-        theme_color: '#1E40AF',
-        background_color: '#FFFFFF',
+        name: 'SpotMe - Event Attendance & Achievements',
+        short_name: 'SpotMe',
+        description: 'Discover events, attend, and earn verified digital badges',
+        theme_color: '#ff3800',
+        background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
         icons: [
           {
-            src: '/vite.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml'
-          },
+            src: '/spotme.svg',
+            sizes: '192x192 512x512',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          }
+        ],
+        screenshots: [
           {
-            src: '/vite.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml'
+            src: '/screenshots/feed.png',
+            sizes: '540x720',
+            type: 'image/png'
           }
         ]
       },
@@ -41,12 +44,30 @@ export default defineConfig({
             options: {
               cacheName: 'supabase-cache',
               expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24, // 24 hours
+              },
+              networkTimeoutSeconds: 10
+            }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.sui\.io\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'sui-cache',
+              expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+                maxAgeSeconds: 60 * 60 // 1 hour
               }
             }
           }
-        ]
+        ],
+        skipWaiting: true,
+        clientsClaim: true
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module'
       }
     })
   ],

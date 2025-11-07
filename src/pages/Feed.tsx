@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFeedAchievements, getAllEvents, getFollowing } from '@/lib/api';
+import { getFeedAchievements, getAllEvents, getFollowing, getAchievements } from '@/lib/api';
 import { FeedPost } from '@/components/FeedPost';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus } from 'lucide-react';
@@ -15,6 +15,7 @@ export function Feed() {
   const [loading, setLoading] = useState(true);
   const [hasFriends, setHasFriends] = useState(false);
   const [feedItems, setFeedItems] = useState<Array<{ type: 'achievement' | 'event'; data: Achievement | Event }>>([]);
+  const [feedFilter, setFeedFilter] = useState<'all' | 'own'>('all');
 
   useEffect(() => {
     if (user) {
@@ -23,10 +24,10 @@ export function Feed() {
   }, [user]);
 
   useEffect(() => {
-    if (user && hasFriends) {
+    if (user) {
       loadFeed();
     }
-  }, [user, hasFriends]);
+  }, [user, hasFriends, feedFilter]);
 
   async function checkFriends() {
     if (!user) return;
@@ -43,13 +44,22 @@ export function Feed() {
   }
 
   async function loadFeed() {
-    if (!user || !hasFriends) return;
+    if (!user) return;
     setLoading(true);
     try {
-      const [achievementsData, eventsData] = await Promise.all([
-        getFeedAchievements(user.id),
-        getAllEvents({ status: 'upcoming', limit: 5 }),
-      ]);
+      let achievementsData: Achievement[] = [];
+      
+      if (feedFilter === 'own') {
+        // Load only user's own posts
+        achievementsData = await getAchievements({ userId: user.id });
+      } else {
+        // Load feed from followed users
+        if (hasFriends) {
+          achievementsData = await getFeedAchievements(user.id);
+        }
+      }
+      
+      const eventsData = feedFilter === 'own' ? [] : await getAllEvents({ status: 'upcoming', limit: 5 });
       
       setAchievements(achievementsData as Achievement[]);
       setEvents(eventsData);
@@ -107,10 +117,34 @@ export function Feed() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
+      {/* Filter Tabs */}
+      <div className="flex gap-2 bg-white rounded-lg p-1 shadow-sm">
+        <Button
+          variant={feedFilter === 'all' ? 'default' : 'ghost'}
+          onClick={() => setFeedFilter('all')}
+          className="flex-1"
+        >
+          Following
+        </Button>
+        <Button
+          variant={feedFilter === 'own' ? 'default' : 'ghost'}
+          onClick={() => setFeedFilter('own')}
+          className="flex-1"
+        >
+          My Posts
+        </Button>
+      </div>
+
       {feedItems.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-xl">
-          <p className="text-gray-500 mb-4">No posts yet.</p>
-          <p className="text-sm text-gray-400">Posts from your friends will appear here!</p>
+          <p className="text-gray-500 mb-4">
+            {feedFilter === 'own' ? 'No posts yet.' : 'No posts yet.'}
+          </p>
+          <p className="text-sm text-gray-400">
+            {feedFilter === 'own' 
+              ? 'Your posts will appear here!' 
+              : 'Posts from your friends will appear here!'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
