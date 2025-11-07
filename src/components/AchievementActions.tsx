@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Share2 } from 'lucide-react';
+import { Heart, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
@@ -135,14 +135,6 @@ export function AchievementActions({ achievement, onUpdate }: AchievementActions
         >
           <MessageCircle className="w-5 h-5" />
           <span>{commentCount > 0 ? commentCount : ''}</span>
-        </button>
-
-        <button
-          className="flex items-center space-x-2 hover:bg-gray-100 rounded-md px-2 py-1 transition-colors"
-          type="button"
-        >
-          <Share2 className="w-5 h-5" />
-          <span>Share</span>
         </button>
       </div>
 

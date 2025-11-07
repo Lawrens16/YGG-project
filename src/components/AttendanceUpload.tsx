@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Camera, Upload, Check, AlertCircle } from 'lucide-react';
 import { Card } from './ui/card';
 import { extractGPSFromPhoto, extractTimestampFromPhoto } from '@/lib/verification';
-import { supabase } from '@/lib/supabase';
+import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 
 interface AttendanceUploadProps {
   eventId: string;
@@ -54,61 +54,31 @@ export function AttendanceUpload({ eventId, eventName, onSuccess }: AttendanceUp
       // Get current date for attendance_day
       const attendanceDay = new Date().toISOString().split('T')[0];
 
-      // Upload photo to Supabase Storage
+      // Upload photo to Supabase Storage with automatic bucket fallback
       const fileExt = photo.name.split('.').pop();
       const fileName = `${eventId}-${user.id}-${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('achievement-photos')
-        .upload(fileName, photo);
+      
+      const { url: imageUrl } = await uploadFile(
+        photo,
+        fileName,
+        STORAGE_BUCKETS.ACHIEVEMENT_PHOTOS,
+        [STORAGE_BUCKETS.VERIFICATION_PHOTOS]
+      );
 
-      if (uploadError) {
-        // Try alternative bucket name
-        const { data: altUploadData, error: altUploadError } = await supabase.storage
-          .from('verification-photos')
-          .upload(fileName, photo);
-        
-        if (altUploadError) {
-          throw new Error('Failed to upload photo: ' + altUploadError.message);
-        }
-        
-        const { data: { publicUrl } } = supabase.storage
-          .from('verification-photos')
-          .getPublicUrl(fileName);
-        
-        // Create achievement as attendance record
-        await createAchievement({
-          user_id: user.id,
-          event_id: eventId,
-          category: 'community',
-          title: `Attended ${eventName}`,
-          description: `Attendance recorded on ${new Date().toLocaleDateString()}`,
-          image_url: publicUrl,
-          gps_latitude: gpsData.latitude,
-          gps_longitude: gpsData.longitude,
-          timestamp: timestamp?.toISOString() || new Date().toISOString(),
-          status: 'verified', // Auto-verify attendance
-          attendance_day: attendanceDay,
-        });
-      } else {
-        const { data: { publicUrl } } = supabase.storage
-          .from('achievement-photos')
-          .getPublicUrl(fileName);
-
-        // Create achievement as attendance record
-        await createAchievement({
-          user_id: user.id,
-          event_id: eventId,
-          category: 'community',
-          title: `Attended ${eventName}`,
-          description: `Attendance recorded on ${new Date().toLocaleDateString()}`,
-          image_url: publicUrl,
-          gps_latitude: gpsData.latitude,
-          gps_longitude: gpsData.longitude,
-          timestamp: timestamp?.toISOString() || new Date().toISOString(),
-          status: 'verified', // Auto-verify attendance
-          attendance_day: attendanceDay,
-        });
-      }
+      // Create achievement as attendance record
+      await createAchievement({
+        user_id: user.id,
+        event_id: eventId,
+        category: 'community',
+        title: `Attended ${eventName}`,
+        description: `Attendance recorded on ${new Date().toLocaleDateString()}`,
+        image_url: imageUrl,
+        gps_latitude: gpsData.latitude,
+        gps_longitude: gpsData.longitude,
+        timestamp: timestamp?.toISOString() || new Date().toISOString(),
+        status: 'verified', // Auto-verify attendance
+        attendance_day: attendanceDay,
+      });
 
       setPhoto(null);
       setPreview(null);

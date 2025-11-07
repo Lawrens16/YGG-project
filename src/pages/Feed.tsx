@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { Achievement, Event } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 
 export function Feed() {
   const { user } = useAuth();
@@ -94,30 +94,14 @@ export function Feed() {
       if (image) {
         const fileExt = image.name.split('.').pop();
         const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('achievement-photos')
-          .upload(fileName, image);
-
-        if (uploadError) {
-          // Try alternative bucket
-          const { data: altUploadData, error: altUploadError } = await supabase.storage
-            .from('verification-photos')
-            .upload(fileName, image);
-          
-          if (altUploadError) {
-            throw new Error('Failed to upload image');
-          }
-          
-          const { data: { publicUrl } } = supabase.storage
-            .from('verification-photos')
-            .getPublicUrl(fileName);
-          imageUrl = publicUrl;
-        } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('achievement-photos')
-            .getPublicUrl(fileName);
-          imageUrl = publicUrl;
-        }
+        
+        const { url } = await uploadFile(
+          image,
+          fileName,
+          STORAGE_BUCKETS.ACHIEVEMENT_PHOTOS,
+          [STORAGE_BUCKETS.VERIFICATION_PHOTOS]
+        );
+        imageUrl = url;
       }
 
       // Create achievement/post

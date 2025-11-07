@@ -10,7 +10,7 @@ import { Award, Calendar, UserPlus, Settings, Camera, X, Check } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/lib/supabase';
+import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 import type { UserProfile, Achievement } from '@/types';
 
 export function Profile() {
@@ -130,31 +130,13 @@ export function Profile() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}-avatar-${Date.now()}.${fileExt}`;
       
-      // Check if Supabase is configured
-      if (!supabase || typeof supabase.storage === 'undefined') {
-        throw new Error('Storage is not configured. Please check your Supabase settings.');
-      }
-
-      // Try to upload
-      const { error: uploadError, data: uploadData } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Upload error details:', uploadError);
-        // Check if bucket doesn't exist
-        if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('not found')) {
-          throw new Error('Storage bucket "avatars" not found. Please create it in your Supabase dashboard.');
-        }
-        throw uploadError;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
+      // Upload using storage helper with automatic bucket fallback
+      const { url: publicUrl } = await uploadFile(
+        file,
+        fileName,
+        STORAGE_BUCKETS.AVATARS,
+        [STORAGE_BUCKETS.ACHIEVEMENT_PHOTOS]
+      );
 
       // Update user profile with new avatar URL
       try {
@@ -203,31 +185,13 @@ export function Profile() {
       const fileExt = file.name.split('.').pop();
       const fileName = `${currentUser.id}-banner-${Date.now()}.${fileExt}`;
       
-      // Check if Supabase is configured
-      if (!supabase || typeof supabase.storage === 'undefined') {
-        throw new Error('Storage is not configured. Please check your Supabase settings.');
-      }
-
-      // Try to upload
-      const { error: uploadError, data: uploadData } = await supabase.storage
-        .from('banners')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        console.error('Upload error details:', uploadError);
-        // Check if bucket doesn't exist
-        if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('not found')) {
-          throw new Error('Storage bucket "banners" not found. Please create it in your Supabase dashboard.');
-        }
-        throw uploadError;
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('banners')
-        .getPublicUrl(fileName);
+      // Upload using storage helper with automatic bucket fallback
+      const { url: publicUrl } = await uploadFile(
+        file,
+        fileName,
+        STORAGE_BUCKETS.BANNERS,
+        [STORAGE_BUCKETS.ACHIEVEMENT_PHOTOS]
+      );
 
       // Update user profile with new banner URL
       try {

@@ -10,7 +10,7 @@ import { CameraVerification } from '@/components/CameraVerification';
 import { AttendanceUpload } from '@/components/AttendanceUpload';
 import { MapPin, Calendar, Users, Code, CheckCircle, XCircle, Camera } from 'lucide-react';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabase';
+import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>();
@@ -85,18 +85,16 @@ export function EventDetail() {
     if (!registration || !event) return;
     
     try {
-      // Upload photo to Supabase Storage
+      // Upload photo to Supabase Storage with automatic bucket fallback
       const fileExt = photo.name.split('.').pop();
       const fileName = `${registration.id}-${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('verification-photos')
-        .upload(fileName, photo);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('verification-photos')
-        .getPublicUrl(fileName);
+      
+      const { url: publicUrl } = await uploadFile(
+        photo,
+        fileName,
+        STORAGE_BUCKETS.VERIFICATION_PHOTOS,
+        [STORAGE_BUCKETS.ACHIEVEMENT_PHOTOS]
+      );
 
       // Verify attendance
       await verifyAttendance(registration.id, publicUrl, gpsData.latitude, gpsData.longitude, timestamp);
