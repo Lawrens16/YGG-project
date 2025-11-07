@@ -61,7 +61,7 @@ export function FloatingJoinButton() {
     <>
       <Button
         onClick={() => setShowModal(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-40"
+        className="fixed bottom-24 right-6 h-14 w-14 rounded-full shadow-lg z-40 sm:bottom-6"
         size="icon"
       >
         <Plus className="h-6 w-6" />
