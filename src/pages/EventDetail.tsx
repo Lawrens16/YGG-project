@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getEvent, registerForEvent, getEventRegistrations, verifyAttendance, issueEventBadges } from '@/lib/api';
+import { getEvent, registerForEvent, getEventRegistrations, verifyAttendance, issueEventBadges, getAchievements } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Event, EventRegistration } from '@/types';
+import type { Event, EventRegistration, Achievement } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { CameraVerification } from '@/components/CameraVerification';
-import { MapPin, Calendar, Users, Code, CheckCircle, XCircle } from 'lucide-react';
+import { AttendanceUpload } from '@/components/AttendanceUpload';
+import { MapPin, Calendar, Users, Code, CheckCircle, XCircle, Camera } from 'lucide-react';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabase';
+import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,9 @@ export function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [showCamera, setShowCamera] = useState(false);
   const [isOrganizer, setIsOrganizer] = useState(false);
+  const [attendanceRecords, setAttendanceRecords] = useState<Achievement[]>([]);
+  const [allAttendanceRecords, setAllAttendanceRecords] = useState<Achievement[]>([]);
+  const [showAttendanceUpload, setShowAttendanceUpload] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -43,6 +47,20 @@ export function EventDetail() {
         setRegistrations(regs);
         const userReg = regs.find(r => r.user_id === user.id);
         setRegistration(userReg || null);
+        
+        // Load user's attendance records
+        if (userReg) {
+          const userAchievements = await getAchievements({ userId: user.id });
+          const eventAttendance = userAchievements.filter(a => a.event_id === id);
+          setAttendanceRecords(eventAttendance);
+        }
+        
+        // Load all attendance records for organizer
+        if (eventData.organizer_id === user.id) {
+          const allAchievements = await getAchievements({});
+          const eventAttendance = allAchievements.filter(a => a.event_id === id && a.image_url);
+          setAllAttendanceRecords(eventAttendance);
+        }
       }
     } catch (error) {
       console.error('Error loading event:', error);
@@ -67,18 +85,16 @@ export function EventDetail() {
     if (!registration || !event) return;
     
     try {
-      // Upload photo to Supabase Storage
+      // Upload photo to Supabase Storage with automatic bucket fallback
       const fileExt = photo.name.split('.').pop();
       const fileName = `${registration.id}-${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('verification-photos')
-        .upload(fileName, photo);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('verification-photos')
-        .getPublicUrl(fileName);
+      
+      const { url: publicUrl } = await uploadFile(
+        photo,
+        fileName,
+        STORAGE_BUCKETS.VERIFICATION_PHOTOS,
+        [STORAGE_BUCKETS.ACHIEVEMENT_PHOTOS]
+      );
 
       // Verify attendance
       await verifyAttendance(registration.id, publicUrl, gpsData.latitude, gpsData.longitude, timestamp);
@@ -115,6 +131,19 @@ export function EventDetail() {
     new Date(event.end_date).getTime() - Date.now() <= 30 * 60 * 1000; // 30 minutes before end
 
   const eventEnded = new Date(event.end_date) < new Date();
+  
+  // Check if event is currently active
+  const eventIsActive = event && 
+    new Date(event.start_date) <= new Date() && 
+    new Date(event.end_date) >= new Date();
+
+  // Check if user has already registered attendance today
+  const hasAttendanceToday = attendanceRecords.some(record => {
+    if (!record.attendance_day) return false;
+    const recordDate = new Date(record.attendance_day).toDateString();
+    const today = new Date().toDateString();
+    return recordDate === today;
+  });
 
   return (
     <div className="p-4 space-y-4">
@@ -207,36 +236,112 @@ export function EventDetail() {
                 Issue Badges to Verified Attendees
               </Button>
             )}
+            {allAttendanceRecords.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-2">Attendance Pictures ({allAttendanceRecords.length})</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+                  {allAttendanceRecords.map((record) => (
+                    <div key={record.id} className="relative">
+                      {record.image_url && (
+                        <img
+                          src={record.image_url}
+                          alt={`Attendance by ${record.user_profiles?.display_name || 'User'}`}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 rounded-b-lg">
+                        {record.user_profiles?.display_name || 'User'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Card>
       )}
 
       {!isOrganizer && user && (
-        <Card className="p-4">
-          {!registration ? (
-            <Button onClick={handleRegister} className="w-full">
-              Register for Event
-            </Button>
-          ) : (
-            <div className="space-y-4">
-              <div className="p-3 bg-green-50 text-green-800 rounded">
-                <div className="font-semibold">Registered</div>
-                <div className="text-sm">Status: {registration.verification_status}</div>
+        <>
+          <Card className="p-4">
+            {!registration ? (
+              <Button onClick={handleRegister} className="w-full">
+                Register for Event
+              </Button>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3 bg-green-50 text-green-800 rounded">
+                  <div className="font-semibold">Registered</div>
+                  <div className="text-sm">Status: {registration.verification_status}</div>
+                </div>
+                {registration.verification_status === 'registered' && canVerify && (
+                  <Button onClick={() => setShowCamera(true)} className="w-full">
+                    Verify Attendance
+                  </Button>
+                )}
+                {registration.verification_status === 'verified' && (
+                  <div className="p-3 bg-blue-50 text-blue-800 rounded">
+                    <div className="font-semibold">Attendance Verified!</div>
+                    <div className="text-sm">You will receive your badge after the event ends.</div>
+                  </div>
+                )}
               </div>
-              {registration.verification_status === 'registered' && canVerify && (
-                <Button onClick={() => setShowCamera(true)} className="w-full">
-                  Verify Attendance
-                </Button>
+            )}
+          </Card>
+
+          {registration && eventIsActive && (
+            <Card className="p-4 mt-4">
+              <h3 className="font-bold mb-3">Daily Attendance</h3>
+              
+              {hasAttendanceToday ? (
+                <div className="p-3 bg-green-50 text-green-800 rounded flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>Attendance registered for today</span>
+                </div>
+              ) : (
+                <>
+                  {showAttendanceUpload ? (
+                    <AttendanceUpload
+                      eventId={event.id}
+                      eventName={event.name}
+                      onSuccess={() => {
+                        setShowAttendanceUpload(false);
+                        loadEvent();
+                      }}
+                    />
+                  ) : (
+                    <Button 
+                      onClick={() => setShowAttendanceUpload(true)}
+                      className="w-full"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Register Today's Attendance
+                    </Button>
+                  )}
+                </>
               )}
-              {registration.verification_status === 'verified' && (
-                <div className="p-3 bg-blue-50 text-blue-800 rounded">
-                  <div className="font-semibold">Attendance Verified!</div>
-                  <div className="text-sm">You will receive your badge after the event ends.</div>
+              
+              {/* Show attendance history */}
+              {attendanceRecords.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="font-semibold text-sm mb-2">Your Attendance History</h4>
+                  <div className="space-y-2">
+                    {attendanceRecords.map((record) => (
+                      <div key={record.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                        <span>
+                          {record.attendance_day 
+                            ? new Date(record.attendance_day).toLocaleDateString()
+                            : new Date(record.created_at).toLocaleDateString()}
+                        </span>
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
+            </Card>
           )}
-        </Card>
+        </>
       )}
 
       {showCamera && event && (

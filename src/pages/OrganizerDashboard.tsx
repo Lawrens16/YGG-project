@@ -29,6 +29,10 @@ export function OrganizerDashboard() {
     email: '',
     capacity: '',
   });
+  const [validationErrors, setValidationErrors] = useState<{
+    start_date?: string;
+    end_date?: string;
+  }>({});
 
   useEffect(() => {
     if (user) {
@@ -53,6 +57,30 @@ export function OrganizerDashboard() {
     e.preventDefault();
     if (!user) return;
 
+    // Validate dates
+    const errors: { start_date?: string; end_date?: string } = {};
+    const startDate = new Date(formData.start_date);
+    const endDate = new Date(formData.end_date);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0); // Reset to start of day for comparison
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+
+    if (startDate < now) {
+      errors.start_date = 'Start date cannot be in the past';
+    }
+
+    if (endDate < startDate) {
+      errors.end_date = 'End date must be on or after start date';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
+    setValidationErrors({});
+
     try {
       await createEvent({
         ...formData,
@@ -75,6 +103,7 @@ export function OrganizerDashboard() {
         email: '',
         capacity: '',
       });
+      setValidationErrors({});
       await loadEvents();
     } catch (error) {
       console.error('Error creating event:', error);
@@ -132,20 +161,42 @@ export function OrganizerDashboard() {
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="datetime-local"
-                placeholder="Start Date"
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                required
-              />
-              <Input
-                type="datetime-local"
-                placeholder="End Date"
-                value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                required
-              />
+              <div>
+                <Input
+                  type="datetime-local"
+                  placeholder="Start Date"
+                  value={formData.start_date}
+                  onChange={(e) => {
+                    const newStartDate = e.target.value;
+                    setFormData({ ...formData, start_date: newStartDate });
+                    // Clear validation errors when user types
+                    setValidationErrors({});
+                  }}
+                  min={new Date().toISOString().slice(0, 16)}
+                  required
+                />
+                {validationErrors.start_date && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.start_date}</p>
+                )}
+              </div>
+              <div>
+                <Input
+                  type="datetime-local"
+                  placeholder="End Date"
+                  value={formData.end_date}
+                  onChange={(e) => {
+                    const newEndDate = e.target.value;
+                    setFormData({ ...formData, end_date: newEndDate });
+                    // Clear validation errors when user types
+                    setValidationErrors({});
+                  }}
+                  min={formData.start_date || new Date().toISOString().slice(0, 16)}
+                  required
+                />
+                {validationErrors.end_date && (
+                  <p className="text-sm text-red-600 mt-1">{validationErrors.end_date}</p>
+                )}
+              </div>
             </div>
             <Input
               placeholder="Contact Info"
@@ -165,8 +216,22 @@ export function OrganizerDashboard() {
               onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
             />
             <div className="flex gap-2">
-              <Button type="submit">Create Event</Button>
-              <Button type="button" variant="outline" onClick={() => setShowCreateForm(false)}>
+
+              <Button 
+                type="submit"
+                disabled={!formData.name.trim() || !formData.start_date || !formData.end_date || Object.keys(validationErrors).length > 0}
+                className="bg-[#ff3800] hover:bg-[#ff5500]"
+              >
+                Create Event
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setValidationErrors({});
+                }}
+              >
                 Cancel
               </Button>
             </div>

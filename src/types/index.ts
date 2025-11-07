@@ -35,6 +35,7 @@ export interface Achievement {
   sui_object_id: string | null;
   points_awarded: number;
   tags: string[] | null;
+  attendance_day: string | null;
   created_at: string;
   updated_at: string;
   user_profiles?: UserProfile;

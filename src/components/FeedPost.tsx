@@ -1,11 +1,14 @@
 import { useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Avatar } from './ui/avatar';
-import { Share2, MoreHorizontal, MapPin, Calendar, Award } from 'lucide-react';
+import { Share2, MoreHorizontal, MapPin, Calendar, Award, Trash2, Check, Link as LinkIcon } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Achievement, Event } from '@/types';
 import { AchievementActions } from './AchievementActions';
+import { deleteAchievement } from '@/lib/api';
 
 interface FeedPostProps {
   achievement?: Achievement;
@@ -15,7 +18,103 @@ interface FeedPostProps {
 
 export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const postUser = achievement?.user_profiles || event?.user_profiles;
+  const isOwner = achievement && user && achievement.user_id === user.id;
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMenu]);
+
+  const handleDelete = async () => {
+    if (!achievement || !user || !isOwner) return;
+    if (!confirm('Are you sure you want to delete this post?')) return;
+    
+    setIsDeleting(true);
+    setShowMenu(false);
+    try {
+      await deleteAchievement(achievement.id, user.id);
+      if (onUpdate) onUpdate();
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete post');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleShare = async () => {
+    const shareUrl = achievement 
+      ? `${window.location.origin}/feed#post-${achievement.id}`
+      : `${window.location.origin}/events/${event?.id}`;
+    const shareText = achievement
+      ? `Check out this post: ${achievement.title}`
+      : `Join me at ${event?.name}`;
+    const shareTitle = achievement?.title || event?.name || '';
+
+    const shareData = {
+      title: shareTitle,
+      text: shareText,
+      url: shareUrl,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        setShowMenu(false);
+      } catch (err) {
+        // User cancelled or error - fallback to copy
+        await handleCopyLink(shareUrl);
+      }
+    } else {
+      await handleCopyLink(shareUrl);
+    }
+  };
+
+  const handleCopyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      setShowMenu(false);
+    } catch (err) {
+      console.error('Error copying:', err);
+      alert('Failed to copy link. Please try again.');
+    }
+  };
+
+  const handleShareFacebook = () => {
+    const shareUrl = achievement 
+      ? `${window.location.origin}/feed#post-${achievement.id}`
+      : `${window.location.origin}/events/${event?.id}`;
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    window.open(fbUrl, '_blank', 'width=600,height=400');
+    setShowMenu(false);
+  };
+
+  const handleShareTwitter = () => {
+    const shareUrl = achievement 
+      ? `${window.location.origin}/feed#post-${achievement.id}`
+      : `${window.location.origin}/events/${event?.id}`;
+    const shareText = achievement
+      ? `Check out this post: ${achievement.title}`
+      : `Join me at ${event?.name}`;
+    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(twitterUrl, '_blank', 'width=600,height=400');
+    setShowMenu(false);
+  };
 
   if (event) {
     return (
@@ -39,9 +138,66 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
                 </div>
               </div>
             </div>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-5 w-5" />
-            </Button>
+            <div className="relative" ref={menuRef}>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
+              >
+                <MoreHorizontal className="h-5 w-5" />
+              </Button>
+              
+              {showMenu && (
+                <Card className="absolute right-0 top-full mt-1 w-48 z-[100] p-2 shadow-lg bg-white border border-gray-200">
+                  <div className="space-y-1">
+                    {navigator.share && (
+                      <button
+                        onClick={handleShare}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                      >
+                        <Share2 className="h-4 w-4" />
+                        Share...
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleCopyLink(
+                        `${window.location.origin}/events/${event.id}`
+                      )}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-4 w-4 text-green-600" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="h-4 w-4" />
+                          Copy Link
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleShareFacebook}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                    >
+                      <span className="h-4 w-4 font-bold">f</span>
+                      Facebook
+                    </button>
+                    <button
+                      onClick={handleShareTwitter}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                    >
+                      <span className="h-4 w-4">𝕏</span>
+                      Twitter
+                    </button>
+                  </div>
+                </Card>
+              )}
+            </div>
           </div>
 
           <h3 className="font-bold text-lg mb-2 cursor-pointer" onClick={() => navigate(`/events/${event.id}`)}>
@@ -74,10 +230,6 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
             >
               View Event
             </Button>
-            <Button variant="ghost" size="sm" className="flex-1">
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
           </div>
         </div>
       </Card>
@@ -105,9 +257,79 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
+          <div className="relative" ref={menuRef}>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </Button>
+            
+            {showMenu && (
+              <Card className="absolute right-0 top-full mt-1 w-48 z-[100] p-2 shadow-lg bg-white border border-gray-200">
+                <div className="space-y-1">
+                  {navigator.share && (
+                    <button
+                      onClick={handleShare}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Share...
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleCopyLink(
+                      `${window.location.origin}/feed#post-${achievement.id}`
+                    )}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4 text-green-600" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="h-4 w-4" />
+                        Copy Link
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleShareFacebook}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                  >
+                    <span className="h-4 w-4 font-bold">f</span>
+                    Facebook
+                  </button>
+                  <button
+                    onClick={handleShareTwitter}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
+                  >
+                    <span className="h-4 w-4">𝕏</span>
+                    Twitter
+                  </button>
+                  {isOwner && (
+                    <>
+                      <div className="border-t border-gray-200 my-1"></div>
+                      <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-red-50 rounded transition-colors text-left text-red-600 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {isDeleting ? 'Deleting...' : 'Delete Post'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </Card>
+            )}
+          </div>
         </div>
 
         <div className="mb-3">
@@ -134,7 +356,9 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
           </div>
         </div>
 
-        {achievement && <AchievementActions achievement={achievement} onUpdate={onUpdate} />}
+        <div className="pt-3 border-t">
+          {achievement && <AchievementActions achievement={achievement} onUpdate={onUpdate} />}
+        </div>
       </div>
     </Card>
   );
