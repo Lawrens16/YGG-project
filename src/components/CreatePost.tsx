@@ -52,7 +52,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
       const registrations = await getUserRegistrations(user.id);
       const registeredEvents = registrations
         .map((reg: EventRegistration) => reg.events)
-        .filter((e: Event | null): e is Event => e !== null && e !== undefined);
+        .filter((e: Event | null | undefined): e is Event => e !== null && e !== undefined);
 
       // Get events user organized
       const organizedEvents = await getEventsByOrganizer(user.id);

@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserProfile, getAchievements, isFollowing, followUser, unfollowUser, updateUserProfile, listPendingFriendRequests, acceptFriendRequest, rejectFriendRequest } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { AchievementCard } from '@/components/AchievementCard';
-import { Award, Calendar, UserPlus, Settings, Camera, X, Check } from 'lucide-react';
+import { Award, Calendar, UserPlus, Settings, Camera, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,7 +14,7 @@ import type { UserProfile, Achievement } from '@/types';
 
 export function Profile() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // Unused but kept for potential navigation needs
   const { user: currentUser, updateUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -27,7 +26,7 @@ export function Profile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
-  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [_loadingRequests, setLoadingRequests] = useState(false);
   
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);

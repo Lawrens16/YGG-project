@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, PlusCircle, User, Award, Settings, LogOut, Calendar, Shield, Users, Search, X } from 'lucide-react';
+import { Home, User, Award, LogOut, Calendar, Shield, Users, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';

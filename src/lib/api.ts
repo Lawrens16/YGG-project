@@ -1008,7 +1008,7 @@ export async function getComments(achievementId: string) {
 }
 
 // Reactions/Likes API - Updated to reference 'achievements' table directly
-export async function toggleReaction(achievementId: string, userId: string, reactionType = 'like') {
+export async function toggleReaction(achievementId: string, userId: string, _reactionType = 'like') {
   if (!isSupabaseConfigured()) {
     const reactions = lsGet<any[]>(LS_REACTIONS, []);
     const existingIndex = reactions.findIndex(
@@ -1633,7 +1633,7 @@ export async function issueEventBadges(eventId: string): Promise<EventRegistrati
     if (fetchError) throw fetchError;
     
     // Update all to badge_issued = true
-    const registrationIds = registrations?.map(r => r.id) || [];
+    const registrationIds = registrations?.map((r: EventRegistration) => r.id) || [];
     if (registrationIds.length === 0) return [];
     
     const { data, error } = await supabase
@@ -1654,7 +1654,7 @@ export async function issueEventBadges(eventId: string): Promise<EventRegistrati
 /**
  * Apply for organizer status
  */
-export async function applyForOrganizer(userId: string, applicationData: any): Promise<UserProfile> {
+export async function applyForOrganizer(userId: string, _applicationData: any): Promise<UserProfile> {
   if (!isSupabaseConfigured()) {
     throw new Error('Mock apply not implemented');
   }
@@ -1797,11 +1797,12 @@ export async function followUser(followerId: string, followedId: string): Promis
       if (shouldMockOnError(error)) {
         const followers = lsGet<any[]>(LS_FOLLOWERS, []);
         const now = new Date().toISOString();
-        const follower = {
+        const follower: Follower = {
           id: uuid(),
           follower_id: followerId,
           followed_id: followedId,
           followed_at: now,
+          created_at: now,
         };
         followers.push(follower);
         lsSet(LS_FOLLOWERS, followers);
@@ -2071,6 +2072,7 @@ export async function createBadgeTemplate(template: Partial<BadgeTemplate>): Pro
       created_by: template.created_by || null,
       is_active: template.is_active ?? true,
       created_at: now,
+      updated_at: now,
     };
   }
   try {

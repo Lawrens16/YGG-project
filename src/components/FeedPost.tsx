@@ -153,7 +153,7 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
               {showMenu && (
                 <Card className="absolute right-0 top-full mt-1 w-48 z-[100] p-2 shadow-lg bg-white border border-gray-200">
                   <div className="space-y-1">
-                    {navigator.share && (
+                    {typeof navigator.share !== 'undefined' && (
                       <button
                         onClick={handleShare}
                         className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"
@@ -272,7 +272,7 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
             {showMenu && (
               <Card className="absolute right-0 top-full mt-1 w-48 z-[100] p-2 shadow-lg bg-white border border-gray-200">
                 <div className="space-y-1">
-                  {navigator.share && (
+                  {typeof navigator.share !== 'undefined' && (
                     <button
                       onClick={handleShare}
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors text-left"

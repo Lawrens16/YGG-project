@@ -12,8 +12,8 @@ import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 export function Feed() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [_achievements, setAchievements] = useState<Achievement[]>([]);
+  const [_events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasFriends, setHasFriends] = useState(false);
   const [feedItems, setFeedItems] = useState<Array<{ type: 'achievement' | 'event'; data: Achievement | Event }>>([]);
@@ -71,8 +71,15 @@ export function Feed() {
         ...(achievementsData as Achievement[]).map(a => ({ type: 'achievement' as const, data: a })),
         ...eventsData.map(e => ({ type: 'event' as const, data: e })),
       ].sort((a, b) => {
-        const dateA = new Date(a.data.created_at || a.data.start_date).getTime();
-        const dateB = new Date(b.data.created_at || b.data.start_date).getTime();
+        const getDate = (item: { type: 'achievement' | 'event'; data: Achievement | Event }): string => {
+          if (item.type === 'achievement') {
+            return (item.data as Achievement).created_at;
+          } else {
+            return (item.data as Event).start_date;
+          }
+        };
+        const dateA = new Date(getDate(a)).getTime();
+        const dateB = new Date(getDate(b)).getTime();
         return dateB - dateA;
       });
       

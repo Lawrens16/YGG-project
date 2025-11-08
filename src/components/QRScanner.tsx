@@ -34,7 +34,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
             onScan(decodedText);
           });
         },
-        (errorMessage) => {
+        (_errorMessage) => {
           // Ignore scanning errors (they're frequent during scanning)
         }
       )

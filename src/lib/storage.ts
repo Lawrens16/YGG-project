@@ -97,7 +97,7 @@ export function getPublicUrl(bucket: string, fileName: string): string {
  */
 export async function bucketExists(bucketName: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from(bucketName)
       .list('', { limit: 1 });
     return !error;
