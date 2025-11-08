@@ -1,24 +1,111 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllEvents, getNearbyEvents } from '@/lib/api';
+import { getAllEvents, getNearbyEvents, getFeaturedEvents } from '@/lib/api';
 import type { Event } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin, Calendar, Users, ArrowRight, Filter, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
-import { calculateEventStatus, sortEvents, filterEventsByStatus, type SortOption } from '@/lib/events';
+import { FeaturedEventCarousel } from '@/components/FeaturedEventCarousel';
+
+type SortOption = 'closest' | 'furthest' | 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
+// Calculate event status based on current time
+function calculateEventStatus(event: Event): 'upcoming' | 'ongoing' | 'finished' | 'cancelled' {
+  const now = new Date();
+  const start = new Date(event.start_date);
+  const end = new Date(event.end_date);
+
+  if (event.status === 'cancelled') {
+    return 'cancelled';
+  }
+
+  if (now < start) {
+    return 'upcoming';
+  } else if (now >= start && now <= end) {
+    return 'ongoing';
+  } else {
+    return 'finished';
+  }
+}
+
+// Filter events by status
+function filterEventsByStatus(
+  events: Event[],
+  filter: 'all' | 'upcoming' | 'ongoing' | 'finished'
+): Event[] {
+  if (filter === 'all') {
+    return events;
+  }
+
+  return events.filter((event) => {
+    const status = calculateEventStatus(event);
+    return status === filter;
+  });
+}
+
+// Sort events based on sort option
+function sortEvents(events: Event[], sortBy: SortOption): Event[] {
+  const sorted = [...events];
+
+  switch (sortBy) {
+    case 'closest':
+      return sorted.sort((a, b) => {
+        const dateA = new Date(a.start_date).getTime();
+        const dateB = new Date(b.start_date).getTime();
+        const now = Date.now();
+        return Math.abs(dateA - now) - Math.abs(dateB - now);
+      });
+    case 'furthest':
+      return sorted.sort((a, b) => {
+        const dateA = new Date(a.start_date).getTime();
+        const dateB = new Date(b.start_date).getTime();
+        const now = Date.now();
+        return Math.abs(dateB - now) - Math.abs(dateA - now);
+      });
+    case 'newest':
+      return sorted.sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    case 'oldest':
+      return sorted.sort((a, b) => {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+    case 'name-asc':
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'name-desc':
+      return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    default:
+      return sorted;
+  }
+}
 
 export function EventFeed() {
   const [allEvents, setAllEvents] = useState<Event[]>([]);
+  const [featuredEvents, setFeaturedEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
   const [nearbyMode, setNearbyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'finished'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('closest');
   const navigate = useNavigate();
 
   useEffect(() => {
+    loadFeaturedEvents();
     loadEvents();
   }, []);
+
+  const loadFeaturedEvents = async () => {
+    setFeaturedLoading(true);
+    try {
+      const featured = await getFeaturedEvents(10); // Get up to 10 featured events
+      setFeaturedEvents(featured);
+    } catch (error) {
+      console.error('Error loading featured events:', error);
+    } finally {
+      setFeaturedLoading(false);
+    }
+  };
 
   const loadEvents = async () => {
     setLoading(true);
@@ -79,8 +166,7 @@ export function EventFeed() {
         return `${baseClasses} bg-muted text-muted-foreground border border-border`;
     }
   };
-
-  if (loading) {
+  if (loading && featuredLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -92,13 +178,11 @@ export function EventFeed() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-1">Discover Events</h1>
-          <p className="text-muted-foreground">Find and join amazing events near you</p>
-        </div>
+    <div className="p-4 space-y-6">
+      <div className="flex justify-between items-center">
+        <div><h1 className="text-2xl font-bold">Discover Events</h1>
+        <p className="text-gray-600">Find and join amazing events near you</p></div>
+        
         <Button
           variant={nearbyMode ? 'default' : 'outline'}
           onClick={() => setNearbyMode(!nearbyMode)}
@@ -107,6 +191,14 @@ export function EventFeed() {
           {nearbyMode ? 'Show All' : 'Nearby'}
         </Button>
       </div>
+
+      {/* Featured Events Carousel */}
+      {!featuredLoading && featuredEvents.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">Featured Events</h2>
+          <FeaturedEventCarousel events={featuredEvents} autoScrollInterval={4000} />
+        </div>
+      )}
 
       {/* Filters and Sorting */}
       <Card className="p-4">

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Avatar } from './ui/avatar';
-import { Share2, MoreHorizontal, MapPin, Calendar, Award, Trash2, Check, Link as LinkIcon } from 'lucide-react';
+import { Share2, MoreHorizontal, MapPin, Calendar, Award, Trash2, Check, Link as LinkIcon, Star } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Achievement, Event } from '@/types';
 import { AchievementActions } from './AchievementActions';
@@ -117,27 +117,54 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
   };
 
   if (event) {
+    // Ensure backward compatibility with events that might not have featured fields
+    const isFeatured = event.is_featured ?? false;
+    
     return (
-      <Card className="overflow-hidden">
-        {event.banner_url && (
-          <img
-            src={event.banner_url}
-            alt={event.name}
-            className="w-full h-48 object-cover cursor-pointer"
-            onClick={() => navigate(`/events/${event.id}`)}
-          />
+      <Card className={`overflow-hidden ${
+        isFeatured 
+          ? 'border-2 border-transparent bg-gradient-to-br from-[#ff3800]/10 via-transparent to-transparent relative' 
+          : ''
+      }`}>
+        {/* Featured Badge */}
+        {isFeatured && (
+          <div className="absolute top-2 right-2 z-10">
+            <div className="flex items-center gap-1 bg-gradient-to-r from-[#ff3800] to-[#ff6b35] text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+              <Star className="h-3 w-3 fill-current" />
+              <span>FEATURED EVENT</span>
+            </div>
+          </div>
         )}
-        <div className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <Avatar src={postUser?.avatar_url || undefined} alt={postUser?.display_name || 'Organizer'} />
-              <div>
-                <div className="font-semibold text-foreground">{postUser?.display_name || 'Organizer'}</div>
-                <div className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+        
+        {/* Animated gradient border for featured events */}
+        {isFeatured && (
+          <div className="absolute inset-0 rounded-lg p-[2px] bg-gradient-to-br from-[#ff3800] via-[#ff6b35] to-[#ffa500] opacity-50 animate-pulse pointer-events-none" />
+        )}
+        
+        {isFeatured ? (
+          <div className="relative bg-background rounded-lg">
+            {event.banner_url && (
+              <div className="relative">
+                <img
+                  src={event.banner_url}
+                  alt={event.name}
+                  className="w-full h-48 object-cover cursor-pointer"
+                  onClick={() => navigate(`/events/${event.id}`)}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#ff3800]/20 to-transparent" />
+              </div>
+            )}
+            <div className="p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Avatar src={postUser?.avatar_url || undefined} alt={postUser?.display_name || 'Organizer'} />
+                <div>
+                  <div className="font-semibold text-foreground">{postUser?.display_name || 'Organizer'}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+                  </div>
                 </div>
               </div>
-            </div>
             <div className="relative" ref={menuRef}>
               <Button 
                 variant="ghost" 
@@ -200,7 +227,7 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
             </div>
           </div>
 
-          <h3 className="font-bold text-lg mb-2 cursor-pointer text-foreground" onClick={() => navigate(`/events/${event.id}`)}>
+          <h3 className={`font-bold text-lg mb-2 cursor-pointer ${isFeatured ? 'text-[#ff3800]' : 'text-foreground'}`} onClick={() => navigate(`/events/${event.id}`)}>
             {event.name}
           </h3>
           {event.description && (
@@ -223,15 +250,133 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
 
           <div className="flex gap-4 pt-3 border-t border-border">
             <Button
-              variant="ghost"
+              variant={isFeatured ? 'default' : 'ghost'}
               size="sm"
               onClick={() => navigate(`/events/${event.id}`)}
-              className="flex-1"
+              className={`flex-1 ${isFeatured ? 'bg-gradient-to-r from-[#ff3800] to-[#ff6b35] hover:from-[#ff6b35] hover:to-[#ff3800] text-white' : ''}`}
             >
               View Event
             </Button>
           </div>
-        </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {event.banner_url && (
+              <img
+                src={event.banner_url}
+                alt={event.name}
+                className="w-full h-48 object-cover cursor-pointer"
+                onClick={() => navigate(`/events/${event.id}`)}
+              />
+            )}
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <Avatar src={postUser?.avatar_url || undefined} alt={postUser?.display_name || 'Organizer'} />
+                  <div>
+                    <div className="font-semibold text-foreground">{postUser?.display_name || 'Organizer'}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+                    </div>
+                  </div>
+                </div>
+                <div className="relative" ref={menuRef}>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(!showMenu);
+                    }}
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                  
+                  {showMenu && (
+                    <Card className="absolute right-0 top-full mt-1 w-48 z-[100] p-2 shadow-lg">
+                      <div className="space-y-1">
+                        {typeof navigator.share !== 'undefined' && (
+                          <button
+                            onClick={handleShare}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded transition-colors text-left text-foreground"
+                          >
+                            <Share2 className="h-4 w-4" />
+                            Share...
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleCopyLink(
+                            `${window.location.origin}/events/${event.id}`
+                          )}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded transition-colors text-left text-foreground"
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="h-4 w-4 text-green-600" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <LinkIcon className="h-4 w-4" />
+                              Copy Link
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={handleShareFacebook}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded transition-colors text-left text-foreground"
+                        >
+                          <span className="h-4 w-4 font-bold">f</span>
+                          Facebook
+                        </button>
+                        <button
+                          onClick={handleShareTwitter}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted rounded transition-colors text-left text-foreground"
+                        >
+                          <span className="h-4 w-4">𝕏</span>
+                          Twitter
+                        </button>
+                      </div>
+                    </Card>
+                  )}
+                </div>
+              </div>
+
+              <h3 className="font-bold text-lg mb-2 cursor-pointer text-foreground" onClick={() => navigate(`/events/${event.id}`)}>
+                {event.name}
+              </h3>
+              {event.description && (
+                <p className="text-muted-foreground mb-3">{event.description}</p>
+              )}
+
+              <div className="space-y-2 text-sm text-muted-foreground mb-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {new Date(event.start_date).toLocaleDateString()} at{' '}
+                    {new Date(event.start_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <span>{event.venue_address}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-3 border-t border-border">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate(`/events/${event.id}`)}
+                  className="flex-1"
+                >
+                  View Event
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </Card>
     );
   }
