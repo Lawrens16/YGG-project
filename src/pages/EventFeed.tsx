@@ -68,15 +68,15 @@ export function EventFeed() {
     const baseClasses = 'px-3 py-1 rounded-full text-xs font-semibold shadow-sm';
     switch (status) {
       case 'upcoming':
-        return `${baseClasses} bg-blue-50 text-blue-700 border border-blue-200`;
+        return `${baseClasses} bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800`;
       case 'ongoing':
-        return `${baseClasses} bg-green-50 text-green-700 border border-green-200`;
+        return `${baseClasses} bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800`;
       case 'finished':
-        return `${baseClasses} bg-gray-50 text-gray-700 border border-gray-200`;
+        return `${baseClasses} bg-muted text-muted-foreground border border-border`;
       case 'cancelled':
-        return `${baseClasses} bg-red-50 text-red-700 border border-red-200`;
+        return `${baseClasses} bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800`;
       default:
-        return `${baseClasses} bg-gray-50 text-gray-700 border border-gray-200`;
+        return `${baseClasses} bg-muted text-muted-foreground border border-border`;
     }
   };
 
@@ -85,7 +85,7 @@ export function EventFeed() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading events...</p>
+          <p className="text-muted-foreground font-medium">Loading events...</p>
         </div>
       </div>
     );
@@ -96,8 +96,8 @@ export function EventFeed() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Discover Events</h1>
-          <p className="text-gray-600">Find and join amazing events near you</p>
+          <h1 className="text-3xl font-bold text-foreground mb-1">Discover Events</h1>
+          <p className="text-muted-foreground">Find and join amazing events near you</p>
         </div>
         <Button
           variant={nearbyMode ? 'default' : 'outline'}
@@ -114,8 +114,8 @@ export function EventFeed() {
           {/* Status Filter */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-semibold text-gray-700">Status:</span>
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Status:</span>
             </div>
             <div className="flex gap-2 flex-wrap">
               {(['all', 'upcoming', 'ongoing', 'finished'] as const).map((status) => (
@@ -135,13 +135,13 @@ export function EventFeed() {
           {/* Sort Options */}
           <div className="flex items-center gap-3 flex-wrap lg:ml-auto">
             <div className="flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-semibold text-gray-700">Sort:</span>
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Sort:</span>
             </div>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-4 py-2 text-sm border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+              className="px-4 py-2 text-sm border-2 border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all text-foreground"
             >
               <option value="closest">Closest Date</option>
               <option value="furthest">Furthest Date</option>
@@ -157,9 +157,9 @@ export function EventFeed() {
       {processedEvents.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="max-w-md mx-auto">
-            <Calendar className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-            <p className="text-lg font-semibold text-gray-900 mb-2">No events found</p>
-            <p className="text-gray-500">Try adjusting your filters or check back later</p>
+            <Calendar className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+            <p className="text-lg font-semibold text-foreground mb-2">No events found</p>
+            <p className="text-muted-foreground">Try adjusting your filters or check back later</p>
           </div>
         </Card>
       ) : (
@@ -189,33 +189,33 @@ export function EventFeed() {
                 <div className="p-5">
                   {!event.banner_url && (
                     <div className="flex justify-between items-start mb-3">
-                      <h2 className="text-xl font-bold text-gray-900 flex-1">{event.name}</h2>
+                      <h2 className="text-xl font-bold text-foreground flex-1">{event.name}</h2>
                       <span className={getStatusBadge(eventStatus)}>
                         {eventStatus}
                       </span>
                     </div>
                   )}
                   {event.banner_url && (
-                    <h2 className="text-xl font-bold text-gray-900 mb-3">{event.name}</h2>
+                    <h2 className="text-xl font-bold text-foreground mb-3">{event.name}</h2>
                   )}
                   {event.description && (
-                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm">{event.description}</p>
+                    <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">{event.description}</p>
                   )}
-                  <div className="space-y-2.5 text-sm text-gray-600 mb-4">
+                  <div className="space-y-2.5 text-sm text-muted-foreground mb-4">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
                       <span className="truncate">
                         {format(new Date(event.start_date), 'MMM d, yyyy h:mm a')} -{' '}
                         {format(new Date(event.end_date), 'h:mm a')}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <MapPin className="h-4 w-4 flex-shrink-0" />
                       <span className="truncate">{event.venue_address}</span>
                     </div>
                     {event.capacity && (
                       <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <Users className="h-4 w-4 flex-shrink-0" />
                         <span>Capacity: {event.capacity}</span>
                       </div>
                     )}
