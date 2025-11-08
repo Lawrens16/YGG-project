@@ -112,8 +112,6 @@ export interface Event {
   qr_code_url: string | null;
   event_code: string;
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
-  is_featured?: boolean;
-  featured_priority?: number;
   created_at: string;
   updated_at: string;
   user_profiles?: UserProfile;

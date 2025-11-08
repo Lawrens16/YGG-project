@@ -192,11 +192,11 @@ export function Feed() {
       {feedItems.length === 0 ? (
         <Card className="text-center py-16">
           <div className="max-w-md mx-auto">
-            <UserPlus className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-lg font-semibold text-foreground mb-2">
+            <UserPlus className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+            <p className="text-lg font-semibold text-gray-900 mb-2">
               {feedFilter === 'own' ? 'No posts yet.' : 'No posts yet.'}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-gray-500">
               {feedFilter === 'own' 
                 ? 'Your posts will appear here!' 
                 : 'Posts from your friends will appear here!'}

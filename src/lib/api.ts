@@ -1265,50 +1265,6 @@ export async function getReactions(achievementId: string) {
   }
 }
 
-// ========== IMAGE UPLOAD API ==========
-
-/**
- * Upload an image to Supabase storage
- */
-export async function uploadImage(file: File, folder: string = 'events'): Promise<string> {
-  if (!isSupabaseConfigured()) {
-    // For mock mode, return a data URL
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-  }
-  
-  try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    
-    const { data, error } = await supabase.storage
-      .from('images')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-    
-    if (error) throw error;
-    
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('images')
-      .getPublicUrl(data.path);
-    
-    return publicUrl;
-  } catch (e: any) {
-    // Fallback to data URL if storage fails
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-  }
-}
-
 // ========== EVENT MANAGEMENT API ==========
 
 /**
@@ -1519,7 +1475,6 @@ export async function getNearbyEvents(
 export async function getAllEvents(filters?: {
   status?: string;
   limit?: number;
-  is_featured?: boolean;
 }): Promise<Event[]> {
   if (!isSupabaseConfigured()) {
     return [];
@@ -1533,9 +1488,6 @@ export async function getAllEvents(filters?: {
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
-    if (filters?.is_featured !== undefined) {
-      query = query.eq('is_featured', filters.is_featured);
-    }
     if (filters?.limit) {
       query = query.limit(filters.limit);
     }
@@ -1543,62 +1495,6 @@ export async function getAllEvents(filters?: {
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
-  } catch (e: any) {
-    throw e;
-  }
-}
-
-/**
- * Get featured events ordered by priority (for carousel)
- */
-export async function getFeaturedEvents(limit?: number): Promise<Event[]> {
-  if (!isSupabaseConfigured()) {
-    return [];
-  }
-  try {
-    let query = supabase
-      .from('events')
-      .select('*, user_profiles(*)')
-      .eq('is_featured', true)
-      .order('featured_priority', { ascending: false })
-      .order('start_date', { ascending: true }); // Show upcoming events first
-    
-    if (limit) {
-      query = query.limit(limit);
-    }
-    
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
-  } catch (e: any) {
-    throw e;
-  }
-}
-
-/**
- * Update event featured status (admin/organizer only)
- */
-export async function updateEventFeaturedStatus(
-  eventId: string,
-  isFeatured: boolean,
-  featuredPriority: number = 0
-): Promise<Event> {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Supabase not configured');
-  }
-  try {
-    const { data, error } = await supabase
-      .from('events')
-      .update({
-        is_featured: isFeatured,
-        featured_priority: featuredPriority,
-      })
-      .eq('id', eventId)
-      .select('*, user_profiles(*)')
-      .single();
-    
-    if (error) throw error;
-    return data;
   } catch (e: any) {
     throw e;
   }

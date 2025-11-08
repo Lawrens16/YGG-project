@@ -28,28 +28,6 @@
     --ring: 9 100% 50%; /* Coquelicot */
     --radius: 0.75rem;
   }
-
-  .dark {
-    --background: 0 0% 10%; /* Void (Deep Black/Charcoal) */
-    --foreground: 0 0% 98%; /* Ivory White */
-    --card: 0 0% 15%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 15%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 9 100% 50%; /* Coquelicot (Bright Red-Orange) #ff3800 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 65%;
-    --accent: 9 100% 50%; /* Coquelicot */
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 25%;
-    --input: 0 0% 25%;
-    --ring: 9 100% 50%; /* Coquelicot */
-  }
 }
 
 @layer base {
@@ -83,16 +61,8 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.08);
   }
   
-  .dark .shadow-soft {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.4);
-  }
-  
   .shadow-elevated {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.12);
-  }
-  
-  .dark .shadow-elevated {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.5);
   }
 }
 

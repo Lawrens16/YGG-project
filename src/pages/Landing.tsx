@@ -9,7 +9,7 @@ export function Landing() {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
         <motion.div
@@ -19,7 +19,7 @@ export function Landing() {
           className="text-center"
         >
           <motion.div 
-            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 bg-primary/10 dark:bg-primary/20 shadow-soft"
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 bg-gradient-to-br from-orange-100 to-orange-50 shadow-soft"
             whileHover={{ scale: 1.05, rotate: 5 }}
             transition={{ type: "spring", stiffness: 300 }}
           >
@@ -30,11 +30,11 @@ export function Landing() {
             />
           </motion.div>
           
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 bg-clip-text text-balance">
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 bg-clip-text text-balance">
             SpotMe
           </h1>
           
-          <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto text-balance leading-relaxed">
+          <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-3xl mx-auto text-balance leading-relaxed">
             Discover events, attend, and earn verified digital badges. 
             Build your portfolio with blockchain-verified event achievements.
           </p>
@@ -83,13 +83,13 @@ function FeatureCard({ icon: Icon, title, description }: { icon: any; title: str
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.2 }}
       whileHover={{ y: -4 }}
-      className="bg-card rounded-2xl p-8 shadow-soft hover:shadow-elevated transition-all duration-300 border border-border"
+      className="bg-white rounded-2xl p-8 shadow-soft hover:shadow-elevated transition-all duration-300 border border-gray-100"
     >
-      <div className="w-14 h-14 bg-primary/10 dark:bg-primary/20 rounded-xl flex items-center justify-center mb-5 shadow-sm">
+      <div className="w-14 h-14 bg-gradient-to-br from-orange-100 to-orange-50 rounded-xl flex items-center justify-center mb-5 shadow-sm">
         <Icon className="w-7 h-7 text-primary" />
       </div>
-      <h3 className="text-xl font-bold text-foreground mb-3">{title}</h3>
-      <p className="text-muted-foreground leading-relaxed">{description}</p>
+      <h3 className="text-xl font-bold text-gray-900 mb-3">{title}</h3>
+      <p className="text-gray-600 leading-relaxed">{description}</p>
     </motion.div>
   );
 }

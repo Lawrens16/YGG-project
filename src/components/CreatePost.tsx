@@ -4,7 +4,6 @@ import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Avatar } from './ui/avatar';
 import { Input } from './ui/input';
-import { Card } from './ui/card';
 import { Image, X, Calendar, Search, MapPin, Clock } from 'lucide-react';
 import { getUserRegistrations, getEventsByOrganizer } from '@/lib/api';
 import type { Event, EventRegistration } from '@/types';
@@ -102,7 +101,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
   };
 
   return (
-    <Card className="p-4 relative">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 relative">
       <div className="flex gap-3">
         <Avatar src={user?.avatar_url || undefined} alt={user?.display_name || 'You'} />
         <div className="flex-1">
@@ -132,14 +131,14 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
               </div>
             )}
             {selectedEventId && (
-              <div className="flex items-center gap-2 p-3 bg-primary/10 dark:bg-primary/20 rounded-lg border border-primary/20">
-                <Calendar className="h-4 w-4 text-primary flex-shrink-0" />
+              <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border border-orange-200">
+                <Calendar className="h-4 w-4 text-orange-600 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground">
+                  <div className="text-sm font-medium text-orange-900">
                     {events.find(e => e.id === selectedEventId)?.name || 'Event'}
                   </div>
                   {events.find(e => e.id === selectedEventId)?.start_date && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-orange-700">
                       {new Date(events.find(e => e.id === selectedEventId)!.start_date).toLocaleDateString()}
                     </div>
                   )}
@@ -149,21 +148,21 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setSelectedEventId('')}
-                  className="h-6 w-6 p-0 flex-shrink-0 hover:bg-primary/20"
+                  className="h-6 w-6 p-0 flex-shrink-0 hover:bg-orange-200"
                   title="Remove event tag"
                 >
                   <X className="h-3 w-3" />
                 </Button>
               </div>
             )}
-            <div className="flex items-center justify-between pt-2 border-t border-border relative">
+            <div className="flex items-center justify-between pt-2 border-t relative">
               <div className="flex gap-2 relative">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  className="text-muted-foreground"
+                  className="text-gray-600"
                 >
                   <Image className="h-4 w-4 mr-2" />
                   Photo
@@ -177,17 +176,19 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                       setShowEventSelector(!showEventSelector);
                       setEventSearchQuery('');
                     }}
-                    className={`text-muted-foreground ${selectedEventId ? 'bg-primary/10 dark:bg-primary/20 text-primary' : ''}`}
+                    className={`text-gray-600 ${selectedEventId ? 'bg-orange-50 text-orange-700' : ''}`}
                   >
                     <Calendar className="h-4 w-4 mr-2" />
                     {selectedEventId ? 'Change Event' : 'Tag Event'}
                   </Button>
                   {showEventSelector && (
-                    <Card className="absolute bottom-full left-0 mb-2 w-80 shadow-xl max-h-80 overflow-hidden z-50 flex flex-col">
+                    <div 
+                      className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-xl max-h-80 overflow-hidden z-50 flex flex-col"
+                    >
                   {/* Search bar */}
-                  <div className="p-3 border-b border-border">
+                  <div className="p-3 border-b border-gray-200">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         type="text"
                         placeholder="Search events..."
@@ -203,9 +204,9 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                   <div className="overflow-y-auto max-h-64">
                     {events.length === 0 ? (
                       <div className="p-6 text-center">
-                        <Calendar className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground mb-1">No events found</p>
-                        <p className="text-xs text-muted-foreground/70">Register for events or create your own to tag them</p>
+                        <Calendar className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-500 mb-1">No events found</p>
+                        <p className="text-xs text-gray-400">Register for events or create your own to tag them</p>
                       </div>
                     ) : (
                       (() => {
@@ -216,7 +217,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
 
                         if (filteredEvents.length === 0) {
                           return (
-                            <div className="p-4 text-center text-sm text-muted-foreground">
+                            <div className="p-4 text-center text-sm text-gray-500">
                               No events match "{eventSearchQuery}"
                             </div>
                           );
@@ -236,31 +237,31 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                                 setShowEventSelector(false);
                                 setEventSearchQuery('');
                               }}
-                              className={`w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b border-border last:border-b-0 ${
-                                selectedEventId === event.id ? 'bg-primary/10 dark:bg-primary/20' : ''
+                              className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
+                                selectedEventId === event.id ? 'bg-orange-50 border-orange-200' : ''
                               }`}
                             >
                               <div className="flex items-start gap-3">
                                 <div className="flex-shrink-0 mt-0.5">
-                                  <Calendar className={`h-4 w-4 ${isPast ? 'text-muted-foreground' : 'text-primary'}`} />
+                                  <Calendar className={`h-4 w-4 ${isPast ? 'text-gray-400' : 'text-orange-600'}`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="font-medium text-sm text-foreground truncate">
+                                    <span className="font-medium text-sm text-gray-900 truncate">
                                       {event.name}
                                     </span>
                                     {isOrganized && (
-                                      <span className="px-2 py-0.5 bg-primary/10 dark:bg-primary/20 text-primary text-xs rounded-full flex-shrink-0">
+                                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full flex-shrink-0">
                                         Your Event
                                       </span>
                                     )}
                                   </div>
                                   {event.description && (
-                                    <p className="text-xs text-muted-foreground line-clamp-1 mb-1">
+                                    <p className="text-xs text-gray-600 line-clamp-1 mb-1">
                                       {event.description}
                                     </p>
                                   )}
-                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <div className="flex items-center gap-3 text-xs text-gray-500">
                                     <div className="flex items-center gap-1">
                                       <Clock className="h-3 w-3" />
                                       <span>
@@ -281,7 +282,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                                 </div>
                                 {selectedEventId === event.id && (
                                   <div className="flex-shrink-0">
-                                    <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                                    <div className="h-5 w-5 rounded-full bg-orange-600 flex items-center justify-center">
                                       <X className="h-3 w-3 text-white" />
                                     </div>
                                   </div>
@@ -293,7 +294,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
                       })()
                     )}
                   </div>
-                </Card>
+                </div>
                   )}
                 </div>
               </div>
@@ -315,7 +316,7 @@ export function CreatePost({ onSubmit }: CreatePostProps) {
           </form>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 

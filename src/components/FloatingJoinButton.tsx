@@ -57,10 +57,6 @@ export function FloatingJoinButton() {
     }
   };
 
-  if (!user) {
-    return null;
-  }
-
   return (
     <>
       <Button
@@ -73,9 +69,9 @@ export function FloatingJoinButton() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-foreground">Join Event</h2>
+              <h2 className="text-xl font-bold">Join Event</h2>
               <Button variant="ghost" size="icon" onClick={() => setShowModal(false)}>
                 <X className="h-5 w-5" />
               </Button>
@@ -90,7 +86,7 @@ export function FloatingJoinButton() {
                 Scan QR Code
               </Button>
 
-              <div className="text-center text-sm text-muted-foreground">or</div>
+              <div className="text-center text-sm text-gray-500">or</div>
 
               <form onSubmit={handleCodeSubmit} className="space-y-2">
                 <Input
