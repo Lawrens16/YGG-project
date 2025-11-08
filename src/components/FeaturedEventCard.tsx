@@ -22,23 +22,22 @@ export function FeaturedEventCard({ event, className = '' }: FeaturedEventCardPr
       className={`relative ${className}`}
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
-      onHoverStart={(e) => {
-        // Pause auto-scroll on hover (handled by parent carousel)
-      }}
     >
       {/* Animated gradient border */}
       <div className="relative p-[3px] rounded-xl bg-gradient-to-br from-[#ff3800] via-[#ff6b35] to-[#ffa500] animate-gradient-shift">
         <Card className="relative bg-white rounded-lg overflow-hidden h-full flex flex-col">
           {/* Featured Badge - Diagonal Ribbon */}
-          <div className="absolute top-0 right-0 z-10">
-            <div className="relative">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#ff3800] to-[#ff6b35] transform rotate-45 translate-x-8 -translate-y-8 shadow-lg" />
-              <div className="absolute top-2 right-2 z-20 flex items-center gap-1 text-white font-bold text-xs">
-                <Star className="h-3 w-3 fill-current" />
-                <span>FEATURED</span>
+          {isFeatured && (
+            <div className="absolute top-0 right-0 z-10">
+              <div className="relative">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#ff3800] to-[#ff6b35] transform rotate-45 translate-x-8 -translate-y-8 shadow-lg" />
+                <div className="absolute top-2 right-2 z-20 flex items-center gap-1 text-white font-bold text-xs">
+                  <Star className="h-3 w-3 fill-current" />
+                  <span>FEATURED</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Banner Image */}
           {event.banner_url ? (

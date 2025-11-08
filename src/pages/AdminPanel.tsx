@@ -19,10 +19,10 @@ interface EventFeaturedControlsProps {
 }
 
 function EventFeaturedControls({ event, onUpdate }: EventFeaturedControlsProps) {
-  const [isFeatured, setIsFeatured] = useState(event.is_featured || false);
-  const [priority, setPriority] = useState(event.featured_priority || 0);
+  const [isFeatured, setIsFeatured] = useState(event.is_featured ?? false);
+  const [priority, setPriority] = useState(event.featured_priority ?? 0);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [priorityInput, setPriorityInput] = useState(String(event.featured_priority || 0));
+  const [priorityInput, setPriorityInput] = useState(String(event.featured_priority ?? 0));
 
   const handleToggleFeatured = async () => {
     setIsUpdating(true);

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { uploadFile, STORAGE_BUCKETS } from './storage';
 import type { Achievement, UserProfile, PeerTag, Event, EventRegistration, BadgeTemplate, Follower } from '../types';
 
 // --- Lightweight client-side mock fallback when Supabase isn't configured ---
@@ -1268,45 +1269,22 @@ export async function getReactions(achievementId: string) {
 // ========== IMAGE UPLOAD API ==========
 
 /**
- * Upload an image to Supabase storage
+ * Upload an image to Supabase storage (for event banners)
+ * Uses the banners bucket and throws an error if upload fails (no Base64 fallback)
  */
 export async function uploadImage(file: File, folder: string = 'events'): Promise<string> {
-  if (!isSupabaseConfigured()) {
-    // For mock mode, return a data URL
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-  }
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
   
-  try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    
-    const { data, error } = await supabase.storage
-      .from('images')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-    
-    if (error) throw error;
-    
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('images')
-      .getPublicUrl(data.path);
-    
-    return publicUrl;
-  } catch (e: any) {
-    // Fallback to data URL if storage fails
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
-    });
-  }
+  // Use the storage helper with banners bucket for event banners
+  const { url } = await uploadFile(
+    file,
+    fileName,
+    STORAGE_BUCKETS.BANNERS,
+    [STORAGE_BUCKETS.ACHIEVEMENT_PHOTOS] // Fallback to achievement-photos if banners bucket doesn't exist
+  );
+  
+  return url;
 }
 
 // ========== EVENT MANAGEMENT API ==========
