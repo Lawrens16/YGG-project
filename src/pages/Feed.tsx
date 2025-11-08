@@ -33,7 +33,8 @@ export function Feed() {
   useEffect(() => {
     async function loadFeatured() {
       try {
-        const featured = await getFeaturedEvents(5);
+        // Get all featured events (they're already sorted by priority)
+        const featured = await getFeaturedEvents(20);
         setFeaturedEvents(featured);
       } catch (error) {
         console.error('Error loading featured events:', error);

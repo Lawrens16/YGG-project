@@ -17,6 +17,10 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Split events: top 5 in hero, rest in bubbles
+  const topEvents = events.slice(0, 5);
+  const overflowEvents = events.slice(5);
+
   // Load collapse state from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('featuredEventsCollapsed');
@@ -34,10 +38,12 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
 
   if (events.length === 0) return null;
 
-  const currentEvent = events[currentIndex];
-  const isFeatured = currentEvent.is_featured ?? false;
+  // Ensure currentIndex is within bounds
+  const safeIndex = Math.min(currentIndex, topEvents.length - 1);
+  const currentEvent = topEvents[safeIndex];
+  const isFeatured = currentEvent?.is_featured ?? false;
 
-  // If collapsed, show only story bubbles
+  // If collapsed, show only story bubbles (all events)
   if (isCollapsed) {
     return (
       <div className="mb-6">
@@ -58,8 +64,15 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
             <StoryBubble
               key={event.id}
               event={event}
-              isActive={index === currentIndex}
-              onClick={() => setCurrentIndex(index)}
+              isActive={index === currentIndex && index < 5}
+              onClick={() => {
+                if (index < 5) {
+                  setCurrentIndex(index);
+                  setIsCollapsed(false); // Expand to show hero
+                } else {
+                  navigate(`/events/${event.id}`);
+                }
+              }}
             />
           ))}
         </div>
@@ -86,11 +99,12 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
         </Button>
       </div>
 
-      {/* Hero Card */}
-      <Card
-        className="relative overflow-hidden cursor-pointer group"
-        onClick={() => navigate(`/events/${currentEvent.id}`)}
-      >
+      {/* Hero Card - Only show if we have top events */}
+      {topEvents.length > 0 && currentEvent && (
+        <Card
+          className="relative overflow-hidden cursor-pointer group"
+          onClick={() => navigate(`/events/${currentEvent.id}`)}
+        >
         <div className="relative h-[300px] md:h-[350px] overflow-hidden rounded-lg">
           <AnimatePresence mode="wait">
             <motion.div
@@ -182,12 +196,13 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
           </div>
         </div>
       </Card>
+      )}
 
-      {/* Story Bubbles */}
-      {events.length > 1 && (
+      {/* Story Bubbles - Show dots only for top 5, bubbles for all */}
+      {topEvents.length > 1 && (
         <div className="mt-4">
           <div className="flex items-center justify-center gap-2 mb-4">
-            {events.map((_, index) => (
+            {topEvents.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
@@ -200,14 +215,29 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
               />
             ))}
           </div>
+        </div>
+      )}
 
+      {/* Story Bubbles Row - All featured events */}
+      {events.length > 0 && (
+        <div className="mt-4">
           <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-            {events.map((event, index) => (
+            {/* Top 5 events in hero */}
+            {topEvents.map((event, index) => (
               <StoryBubble
                 key={event.id}
                 event={event}
                 isActive={index === currentIndex}
                 onClick={() => setCurrentIndex(index)}
+              />
+            ))}
+            {/* Overflow events (6th onwards) */}
+            {overflowEvents.map((event) => (
+              <StoryBubble
+                key={event.id}
+                event={event}
+                isActive={false}
+                onClick={() => navigate(`/events/${event.id}`)}
               />
             ))}
           </div>

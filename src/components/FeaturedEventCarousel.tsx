@@ -148,13 +148,13 @@ export function FeaturedEventCarousel({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
-            className="grid gap-4"
+            className="grid gap-4 items-stretch"
             style={{
               gridTemplateColumns: `repeat(${slidesToShow}, 1fr)`,
             }}
           >
             {currentEvents.map((event) => (
-              <FeaturedEventCard key={event.id} event={event} />
+              <FeaturedEventCard key={event.id} event={event} className="h-full" />
             ))}
             {/* Fill empty slots if needed */}
             {Array.from({ length: slidesToShow - currentEvents.length }).map((_, i) => (
@@ -184,9 +184,9 @@ export function FeaturedEventCarousel({
       {totalSlides > 1 && (
         <>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg rounded-full h-10 w-10"
+            className="absolute -left-4 md:-left-6 top-1/2 -translate-y-1/2 z-10 bg-background/40 hover:bg-background/70 backdrop-blur-sm border-0 shadow-md rounded-full h-9 w-9 opacity-60 hover:opacity-100 transition-opacity"
             onClick={prevSlide}
             aria-label="Previous slide"
             onKeyDown={(e) => {
@@ -196,12 +196,12 @@ export function FeaturedEventCarousel({
               }
             }}
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4 text-foreground" />
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg rounded-full h-10 w-10"
+            className="absolute -right-4 md:-right-6 top-1/2 -translate-y-1/2 z-10 bg-background/40 hover:bg-background/70 backdrop-blur-sm border-0 shadow-md rounded-full h-9 w-9 opacity-60 hover:opacity-100 transition-opacity"
             onClick={nextSlide}
             aria-label="Next slide"
             onKeyDown={(e) => {
@@ -211,7 +211,7 @@ export function FeaturedEventCarousel({
               }
             }}
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4 text-foreground" />
           </Button>
         </>
       )}
