@@ -19,22 +19,22 @@ export function FeaturedEventCard({ event, className = '' }: FeaturedEventCardPr
 
   return (
     <motion.div
-      className={`relative ${className}`}
+      className={`relative group ${className}`}
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
     >
       {/* Animated gradient border */}
       <div className="relative p-[3px] rounded-xl bg-gradient-to-br from-[#ff3800] via-[#ff6b35] to-[#ffa500] animate-gradient-shift">
-        <Card className="relative bg-white rounded-lg overflow-hidden h-full flex flex-col">
-          {/* Featured Badge - Diagonal Ribbon */}
+        <Card className="relative bg-white dark:bg-card rounded-lg overflow-hidden h-full flex flex-col">
+          {/* Animated background gradient on hover */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#ff3800]/10 via-[#ff6b35]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+          
+          {/* Featured Badge */}
           {isFeatured && (
-            <div className="absolute top-0 right-0 z-10">
-              <div className="relative">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#ff3800] to-[#ff6b35] transform rotate-45 translate-x-8 -translate-y-8 shadow-lg" />
-                <div className="absolute top-2 right-2 z-20 flex items-center gap-1 text-white font-bold text-xs">
-                  <Star className="h-3 w-3 fill-current" />
-                  <span>FEATURED</span>
-                </div>
+            <div className="absolute top-2 right-2 z-10">
+              <div className="bg-gradient-to-r from-[#ff3800] to-[#ff6b35] text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg">
+                <Star className="h-3 w-3 fill-current" />
+                FEATURED
               </div>
             </div>
           )}
@@ -103,8 +103,8 @@ export function FeaturedEventCard({ event, className = '' }: FeaturedEventCardPr
             </Button>
           </div>
 
-          {/* Glow effect overlay */}
-          <div className="absolute inset-0 pointer-events-none rounded-lg opacity-0 hover:opacity-100 transition-opacity duration-300">
+          {/* Enhanced glow effect overlay */}
+          <div className="absolute inset-0 pointer-events-none rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-[#ff3800]/20 via-[#ff6b35]/10 to-transparent blur-xl" />
           </div>
         </Card>
