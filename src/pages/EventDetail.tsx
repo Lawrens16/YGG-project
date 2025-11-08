@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getEvent, registerForEvent, getEventRegistrations, verifyAttendance, issueEventBadges, getAchievements } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Event, EventRegistration, Achievement } from '@/types';
@@ -15,7 +15,7 @@ import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 export function EventDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // Unused but kept for potential navigation needs
   const [event, setEvent] = useState<Event | null>(null);
   const [registration, setRegistration] = useState<EventRegistration | null>(null);
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
@@ -51,14 +51,14 @@ export function EventDetail() {
         // Load user's attendance records
         if (userReg) {
           const userAchievements = await getAchievements({ userId: user.id });
-          const eventAttendance = userAchievements.filter(a => a.event_id === id);
+          const eventAttendance = userAchievements.filter((a: Achievement) => a.event_id === id);
           setAttendanceRecords(eventAttendance);
         }
         
         // Load all attendance records for organizer
         if (eventData.organizer_id === user.id) {
           const allAchievements = await getAchievements({});
-          const eventAttendance = allAchievements.filter(a => a.event_id === id && a.image_url);
+          const eventAttendance = allAchievements.filter((a: Achievement) => a.event_id === id && a.image_url);
           setAllAttendanceRecords(eventAttendance);
         }
       }
@@ -206,7 +206,7 @@ export function EventDetail() {
           <div className="space-y-4">
             <div>
               <h3 className="font-semibold mb-2">QR Code</h3>
-              <QRCodeGenerator value={event.event_code} />
+              <QRCodeGenerator value={event.event_code || ''} />
             </div>
             <div>
               <h3 className="font-semibold mb-2">Registrations ({registrations.length})</h3>

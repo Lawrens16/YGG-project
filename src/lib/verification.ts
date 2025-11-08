@@ -36,7 +36,7 @@ export async function verifyEventAttendance(
     const exif = await exifr.parse(photo, {
       gps: true,
       exif: true,
-      ifd0: true,
+      ifd0: {},
     });
 
     const photoLat = exif?.latitude;
@@ -85,7 +85,7 @@ export async function verifyEventAttendance(
     // Check 3: Photo is not reused (check hash against existing)
     // Note: This would require checking against a database of photo hashes
     // For now, we'll skip this check or implement it separately
-    const photoHash = await hashImage(photo);
+    await hashImage(photo); // Hash is computed but not yet used for uniqueness check
     const uniqueValid = true; // Placeholder - implement photo uniqueness check
     if (uniqueValid) {
       confidence += 10;
@@ -154,7 +154,7 @@ function toRad(degrees: number): number {
  */
 function checkTimestamp(
   photoTimestamp: Date,
-  eventStartDate: Date,
+  _eventStartDate: Date,
   eventEndDate: Date
 ): boolean {
   const verificationStart = new Date(eventEndDate);
@@ -200,7 +200,7 @@ export async function extractGPSFromPhoto(photo: File): Promise<{ latitude: numb
  */
 export async function extractTimestampFromPhoto(photo: File): Promise<Date | null> {
   try {
-    const exif = await exifr.parse(photo, { exif: true, ifd0: true });
+    const exif = await exifr.parse(photo, { exif: true, ifd0: {} });
     if (exif?.DateTimeOriginal) {
       return new Date(exif.DateTimeOriginal);
     }

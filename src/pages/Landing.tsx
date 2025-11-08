@@ -1,12 +1,12 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Award, Shield, Users, Zap, ArrowRight, Calendar, MapPin, CheckCircle } from 'lucide-react';
+import { Award, ArrowRight, Calendar, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WalletConnect } from '@/components/WalletConnect';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function Landing() {
-  const { connectWallet, user } = useAuth();
+  const { user } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50">

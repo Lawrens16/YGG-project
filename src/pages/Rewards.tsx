@@ -23,9 +23,10 @@ export function Rewards() {
     );
   }
 
-  const level = getLevelFromPoints(user.skill_points);
+  const skillPoints = user.skill_points ?? 0;
+  const level = getLevelFromPoints(skillPoints);
   const nextLevelPoints = level.level * 50;
-  const progress = (user.skill_points / nextLevelPoints) * 100;
+  const progress = (skillPoints / nextLevelPoints) * 100;
 
   const badges = [
     { name: 'Initiate', earned: level.level >= 1, icon: Award },

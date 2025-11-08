@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createAchievement } from '@/lib/api';
 import { Button } from './ui/button';
-import { Camera, Upload, Check, AlertCircle } from 'lucide-react';
+import { Camera, Check, AlertCircle } from 'lucide-react';
 import { Card } from './ui/card';
 import { extractGPSFromPhoto, extractTimestampFromPhoto } from '@/lib/verification';
 import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';

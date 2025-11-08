@@ -5,7 +5,6 @@ import {
   approveOrganizer,
   rejectOrganizer,
   getAllEvents,
-  revokeOrganizer,
 } from '@/lib/api';
 import type { UserProfile, Event } from '@/types';
 import { Card } from '@/components/ui/card';
@@ -61,16 +60,17 @@ export function AdminPanel() {
     }
   };
 
-  const handleRevoke = async (userId: string) => {
-    if (!confirm('Are you sure you want to revoke organizer privileges?')) return;
-    try {
-      await revokeOrganizer(userId);
-      await loadData();
-    } catch (error) {
-      console.error('Error revoking organizer:', error);
-      alert('Error revoking organizer');
-    }
-  };
+  // Unused function - kept for potential future use
+  // const handleRevoke = async (userId: string) => {
+  //   if (!confirm('Are you sure you want to revoke organizer privileges?')) return;
+  //   try {
+  //     await revokeOrganizer(userId);
+  //     await loadData();
+  //   } catch (error) {
+  //     console.error('Error revoking organizer:', error);
+  //     alert('Error revoking organizer');
+  //   }
+  // };
 
   if (!user?.is_admin) {
     return (

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Share2, Check, Copy, Link as LinkIcon } from 'lucide-react';
+import { Share2, Check, Link as LinkIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 
@@ -10,7 +10,7 @@ interface ShareButtonProps {
   type: 'achievement' | 'event';
 }
 
-export function ShareButton({ title, text, url, type }: ShareButtonProps) {
+export function ShareButton({ title, text, url, type: _type }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -90,7 +90,7 @@ export function ShareButton({ title, text, url, type }: ShareButtonProps) {
       {showMenu && (
         <Card className="absolute right-0 top-full mt-2 w-48 z-[100] p-2 shadow-lg bg-white">
           <div className="space-y-1">
-            {navigator.share && (
+            {typeof navigator.share !== 'undefined' && (
               <button
                 onClick={handleNativeShare}
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors"
