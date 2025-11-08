@@ -13,16 +13,13 @@ interface FeaturedEventCardProps {
 
 export function FeaturedEventCard({ event, className = '' }: FeaturedEventCardProps) {
   const navigate = useNavigate();
-  
-  // Ensure backward compatibility with events that might not have featured fields
-  const isFeatured = event.is_featured ?? false;
 
   return (
     <motion.div
       className={`relative ${className}`}
       whileHover={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
-      onHoverStart={(e) => {
+      onHoverStart={() => {
         // Pause auto-scroll on hover (handled by parent carousel)
       }}
     >
