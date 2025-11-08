@@ -1459,7 +1459,7 @@ export async function getNearbyEvents(
       .lte('venue_latitude', latitude + latDelta)
       .gte('venue_longitude', longitude - lngDelta)
       .lte('venue_longitude', longitude + lngDelta)
-      .in('status', ['upcoming', 'ongoing'])
+      .neq('status', 'cancelled') // Exclude cancelled events
       .order('start_date', { ascending: true });
     
     if (error) throw error;

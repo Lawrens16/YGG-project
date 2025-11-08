@@ -5,6 +5,7 @@ import { FeedPost } from '@/components/FeedPost';
 import { CreatePost } from '@/components/CreatePost';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import type { Achievement, Event } from '@/types';
 import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
@@ -164,41 +165,46 @@ export function Feed() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div className="max-w-2xl mx-auto space-y-6">
       {/* Create Post */}
       <CreatePost onSubmit={handleCreatePost} />
       
       {/* Filter Tabs */}
-      <div className="flex gap-2 bg-white rounded-lg p-1 shadow-sm">
-        <Button
-          variant={feedFilter === 'all' ? 'default' : 'ghost'}
-          onClick={() => setFeedFilter('all')}
-          className="flex-1"
-        >
-          Following
-        </Button>
-        <Button
-          variant={feedFilter === 'own' ? 'default' : 'ghost'}
-          onClick={() => setFeedFilter('own')}
-          className="flex-1"
-        >
-          My Posts
-        </Button>
-      </div>
+      <Card className="p-1">
+        <div className="flex gap-2">
+          <Button
+            variant={feedFilter === 'all' ? 'default' : 'ghost'}
+            onClick={() => setFeedFilter('all')}
+            className="flex-1"
+          >
+            Following
+          </Button>
+          <Button
+            variant={feedFilter === 'own' ? 'default' : 'ghost'}
+            onClick={() => setFeedFilter('own')}
+            className="flex-1"
+          >
+            My Posts
+          </Button>
+        </div>
+      </Card>
 
       {feedItems.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-xl">
-          <p className="text-gray-500 mb-4">
-            {feedFilter === 'own' ? 'No posts yet.' : 'No posts yet.'}
-          </p>
-          <p className="text-sm text-gray-400">
-            {feedFilter === 'own' 
-              ? 'Your posts will appear here!' 
-              : 'Posts from your friends will appear here!'}
-          </p>
-        </div>
+        <Card className="text-center py-16">
+          <div className="max-w-md mx-auto">
+            <UserPlus className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+            <p className="text-lg font-semibold text-gray-900 mb-2">
+              {feedFilter === 'own' ? 'No posts yet.' : 'No posts yet.'}
+            </p>
+            <p className="text-sm text-gray-500">
+              {feedFilter === 'own' 
+                ? 'Your posts will appear here!' 
+                : 'Posts from your friends will appear here!'}
+            </p>
+          </div>
+        </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {feedItems.map((item) => (
             <FeedPost
               key={item.data.id}
@@ -211,7 +217,7 @@ export function Feed() {
       )}
 
       <div className="text-center py-4">
-        <Button variant="outline" onClick={loadFeed} className="w-full">
+        <Button variant="outline" onClick={loadFeed} className="w-full shadow-sm">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh Feed
         </Button>

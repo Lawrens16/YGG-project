@@ -26,7 +26,7 @@
     --border: 0 0% 90%;
     --input: 0 0% 90%;
     --ring: 9 100% 50%; /* Coquelicot */
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 }
 
@@ -35,7 +35,34 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, #ff3800 0%, #ff6b35 100%);
+  }
+  
+  .gradient-soft {
+    background: linear-gradient(135deg, #fff5f0 0%, #ffffff 100%);
+  }
+  
+  .shadow-glow {
+    box-shadow: 0 0 20px rgba(255, 56, 0, 0.15);
+  }
+  
+  .shadow-soft {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+  
+  .shadow-elevated {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.12);
   }
 }
 

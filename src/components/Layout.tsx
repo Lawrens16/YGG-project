@@ -67,18 +67,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
       <OfflineIndicator />
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
+      <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-200/50 shadow-soft">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-4">
-            <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
-              <img 
-                src="/spotme.svg" 
-                alt="SpotMe" 
-                className="w-8 h-8"
-              />
-              <span className="font-bold text-xl text-gray-900">SpotMe</span>
+            <Link to="/" className="flex items-center space-x-2 flex-shrink-0 group">
+              <div className="relative">
+                <img 
+                  src="/spotme.svg" 
+                  alt="SpotMe" 
+                  className="w-8 h-8 transition-transform duration-200 group-hover:scale-110"
+                />
+              </div>
+              <span className="font-bold text-xl text-gray-900 group-hover:text-primary transition-colors">SpotMe</span>
             </Link>
             
             {/* Search Bar */}
@@ -168,10 +170,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Bottom Navigation for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 lg:hidden z-50">
-        <div className="grid grid-cols-5 gap-1">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 shadow-soft lg:hidden z-50">
+        <div className="grid grid-cols-5 gap-1 p-1">
           <NavLink to="/feed" icon={Home} label="Feed" isActive={isActive('/feed')} />
-          <NavLink to="/events" icon={Calendar} label="Events" isActive={isActive('/events')} />
+          <NavLink to="/events" icon={Calendar} label="Events" isActive={isActive('/events') || location.pathname.startsWith('/events/')} />
           <NavLink
             to={user ? `/profile/${user.id}` : "/"}
             icon={User}
@@ -188,8 +190,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200">
-        <div className="p-4 space-y-2">
+      <aside className="hidden lg:block fixed left-0 top-16 bottom-0 w-64 bg-white/95 backdrop-blur-lg border-r border-gray-200/50 shadow-soft">
+        <div className="p-4 space-y-1">
           <NavLink to="/feed" icon={Home} label="Feed" isActive={isActive('/feed')} />
           <NavLink to="/events" icon={Calendar} label="Events" isActive={isActive('/events') || location.pathname.startsWith('/events/')} />
           {user?.is_organizer && (
@@ -203,7 +205,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="lg:ml-64 pb-20 lg:pb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           {children}
         </div>
       </main>
@@ -216,14 +218,14 @@ function NavLink({ to, icon: Icon, label, isActive }: { to: string; icon: any; l
   return (
     <Link
       to={to}
-      className={`flex flex-col items-center justify-center py-3 px-4 space-y-1 transition-colors ${
+      className={`flex flex-col items-center justify-center py-3 px-4 space-y-1 rounded-xl transition-all duration-200 ${
         isActive
-          ? 'text-[#ff3800] bg-orange-50'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          ? 'text-primary bg-orange-50 shadow-sm'
+          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
       }`}
     >
-      <Icon className={`w-5 h-5 ${isActive ? 'text-[#ff3800]' : ''}`} />
-      <span className="text-xs font-medium">{label}</span>
+      <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'text-primary scale-110' : 'group-hover:scale-105'}`} />
+      <span className={`text-xs font-semibold ${isActive ? 'text-primary' : ''}`}>{label}</span>
     </Link>
   );
 }
