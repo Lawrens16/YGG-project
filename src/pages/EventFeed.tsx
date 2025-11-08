@@ -1,24 +1,111 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAllEvents, getNearbyEvents } from '@/lib/api';
+import { getAllEvents, getNearbyEvents, getFeaturedEvents } from '@/lib/api';
 import type { Event } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPin, Calendar, Users, ArrowRight, Filter, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
-import { calculateEventStatus, sortEvents, filterEventsByStatus, type SortOption } from '@/lib/events';
+import { FeaturedEventCarousel } from '@/components/FeaturedEventCarousel';
+
+type SortOption = 'closest' | 'furthest' | 'newest' | 'oldest' | 'name-asc' | 'name-desc';
+
+// Calculate event status based on current time
+function calculateEventStatus(event: Event): 'upcoming' | 'ongoing' | 'finished' | 'cancelled' {
+  const now = new Date();
+  const start = new Date(event.start_date);
+  const end = new Date(event.end_date);
+
+  if (event.status === 'cancelled') {
+    return 'cancelled';
+  }
+
+  if (now < start) {
+    return 'upcoming';
+  } else if (now >= start && now <= end) {
+    return 'ongoing';
+  } else {
+    return 'finished';
+  }
+}
+
+// Filter events by status
+function filterEventsByStatus(
+  events: Event[],
+  filter: 'all' | 'upcoming' | 'ongoing' | 'finished'
+): Event[] {
+  if (filter === 'all') {
+    return events;
+  }
+
+  return events.filter((event) => {
+    const status = calculateEventStatus(event);
+    return status === filter;
+  });
+}
+
+// Sort events based on sort option
+function sortEvents(events: Event[], sortBy: SortOption): Event[] {
+  const sorted = [...events];
+
+  switch (sortBy) {
+    case 'closest':
+      return sorted.sort((a, b) => {
+        const dateA = new Date(a.start_date).getTime();
+        const dateB = new Date(b.start_date).getTime();
+        const now = Date.now();
+        return Math.abs(dateA - now) - Math.abs(dateB - now);
+      });
+    case 'furthest':
+      return sorted.sort((a, b) => {
+        const dateA = new Date(a.start_date).getTime();
+        const dateB = new Date(b.start_date).getTime();
+        const now = Date.now();
+        return Math.abs(dateB - now) - Math.abs(dateA - now);
+      });
+    case 'newest':
+      return sorted.sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    case 'oldest':
+      return sorted.sort((a, b) => {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+    case 'name-asc':
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+    case 'name-desc':
+      return sorted.sort((a, b) => b.name.localeCompare(a.name));
+    default:
+      return sorted;
+  }
+}
 
 export function EventFeed() {
   const [allEvents, setAllEvents] = useState<Event[]>([]);
+  const [featuredEvents, setFeaturedEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
   const [nearbyMode, setNearbyMode] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'finished'>('all');
   const [sortBy, setSortBy] = useState<SortOption>('closest');
   const navigate = useNavigate();
 
   useEffect(() => {
+    loadFeaturedEvents();
     loadEvents();
   }, []);
+
+  const loadFeaturedEvents = async () => {
+    setFeaturedLoading(true);
+    try {
+      const featured = await getFeaturedEvents(10); // Get up to 10 featured events
+      setFeaturedEvents(featured);
+    } catch (error) {
+      console.error('Error loading featured events:', error);
+    } finally {
+      setFeaturedLoading(false);
+    }
+  };
 
   const loadEvents = async () => {
     setLoading(true);
@@ -68,37 +155,34 @@ export function EventFeed() {
     const baseClasses = 'px-3 py-1 rounded-full text-xs font-semibold shadow-sm';
     switch (status) {
       case 'upcoming':
-        return `${baseClasses} bg-blue-50 text-blue-700 border border-blue-200`;
+        return `${baseClasses} bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800`;
       case 'ongoing':
-        return `${baseClasses} bg-green-50 text-green-700 border border-green-200`;
+        return `${baseClasses} bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800`;
       case 'finished':
-        return `${baseClasses} bg-gray-50 text-gray-700 border border-gray-200`;
+        return `${baseClasses} bg-muted text-muted-foreground border border-border`;
       case 'cancelled':
-        return `${baseClasses} bg-red-50 text-red-700 border border-red-200`;
+        return `${baseClasses} bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800`;
       default:
-        return `${baseClasses} bg-gray-50 text-gray-700 border border-gray-200`;
+        return `${baseClasses} bg-muted text-muted-foreground border border-border`;
     }
   };
-
-  if (loading) {
+  if (loading && featuredLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading events...</p>
+          <p className="text-muted-foreground font-medium">Loading events...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Discover Events</h1>
-          <p className="text-gray-600">Find and join amazing events near you</p>
-        </div>
+    <div className="p-4 space-y-6">
+      <div className="flex justify-between items-center">
+        <div><h1 className="text-2xl font-bold">Discover Events</h1>
+        <p className="text-gray-600">Find and join amazing events near you</p></div>
+        
         <Button
           variant={nearbyMode ? 'default' : 'outline'}
           onClick={() => setNearbyMode(!nearbyMode)}
@@ -108,14 +192,22 @@ export function EventFeed() {
         </Button>
       </div>
 
+      {/* Featured Events Carousel */}
+      {!featuredLoading && featuredEvents.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800">Featured Events</h2>
+          <FeaturedEventCarousel events={featuredEvents} autoScrollInterval={4000} />
+        </div>
+      )}
+
       {/* Filters and Sorting */}
       <Card className="p-4">
         <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
           {/* Status Filter */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-semibold text-gray-700">Status:</span>
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Status:</span>
             </div>
             <div className="flex gap-2 flex-wrap">
               {(['all', 'upcoming', 'ongoing', 'finished'] as const).map((status) => (
@@ -135,13 +227,13 @@ export function EventFeed() {
           {/* Sort Options */}
           <div className="flex items-center gap-3 flex-wrap lg:ml-auto">
             <div className="flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-semibold text-gray-700">Sort:</span>
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">Sort:</span>
             </div>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-4 py-2 text-sm border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+              className="px-4 py-2 text-sm border-2 border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all text-foreground"
             >
               <option value="closest">Closest Date</option>
               <option value="furthest">Furthest Date</option>
@@ -157,9 +249,9 @@ export function EventFeed() {
       {processedEvents.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="max-w-md mx-auto">
-            <Calendar className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-            <p className="text-lg font-semibold text-gray-900 mb-2">No events found</p>
-            <p className="text-gray-500">Try adjusting your filters or check back later</p>
+            <Calendar className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+            <p className="text-lg font-semibold text-foreground mb-2">No events found</p>
+            <p className="text-muted-foreground">Try adjusting your filters or check back later</p>
           </div>
         </Card>
       ) : (
@@ -189,33 +281,33 @@ export function EventFeed() {
                 <div className="p-5">
                   {!event.banner_url && (
                     <div className="flex justify-between items-start mb-3">
-                      <h2 className="text-xl font-bold text-gray-900 flex-1">{event.name}</h2>
+                      <h2 className="text-xl font-bold text-foreground flex-1">{event.name}</h2>
                       <span className={getStatusBadge(eventStatus)}>
                         {eventStatus}
                       </span>
                     </div>
                   )}
                   {event.banner_url && (
-                    <h2 className="text-xl font-bold text-gray-900 mb-3">{event.name}</h2>
+                    <h2 className="text-xl font-bold text-foreground mb-3">{event.name}</h2>
                   )}
                   {event.description && (
-                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm">{event.description}</p>
+                    <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">{event.description}</p>
                   )}
-                  <div className="space-y-2.5 text-sm text-gray-600 mb-4">
+                  <div className="space-y-2.5 text-sm text-muted-foreground mb-4">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <Calendar className="h-4 w-4 flex-shrink-0" />
                       <span className="truncate">
                         {format(new Date(event.start_date), 'MMM d, yyyy h:mm a')} -{' '}
                         {format(new Date(event.end_date), 'h:mm a')}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <MapPin className="h-4 w-4 flex-shrink-0" />
                       <span className="truncate">{event.venue_address}</span>
                     </div>
                     {event.capacity && (
                       <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <Users className="h-4 w-4 flex-shrink-0" />
                         <span>Capacity: {event.capacity}</span>
                       </div>
                     )}

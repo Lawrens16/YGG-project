@@ -240,7 +240,7 @@ export function Profile() {
   if (loading) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-500">Loading profile...</p>
+        <p className="text-gray-500 dark:text-gray-400">Loading profile...</p>
       </div>
     );
   }
@@ -248,7 +248,7 @@ export function Profile() {
   if (!profile) {
     return (
       <div className="text-center py-20">
-        <p className="text-gray-500">Profile not found.</p>
+        <p className="text-gray-500 dark:text-gray-400">Profile not found.</p>
       </div>
     );
   }
@@ -287,19 +287,19 @@ export function Profile() {
             className="hidden"
           />
         </div>
-        <CardContent className="pt-20 pb-6 relative z-10 bg-white">
+        <CardContent className="pt-20 pb-6 relative z-10 bg-card">
           <div className="flex flex-col md:flex-row items-start md:items-end space-y-4 md:space-y-0 md:space-x-6">
             <div className="relative -mt-16">
               <Avatar
                 src={profile.avatar_url || undefined}
                 alt={profile.display_name || 'User'}
-                className="w-24 h-24 border-4 border-white shadow-lg"
+                className="w-24 h-24 border-4 border-card shadow-lg"
               />
               {isOwnProfile && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute bottom-0 right-0 rounded-full bg-white border-2 border-gray-200 hover:bg-gray-50 shadow-sm"
+                  className="absolute bottom-0 right-0 rounded-full bg-card border-2 border-border hover:bg-muted shadow-sm"
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
                 >
@@ -315,13 +315,13 @@ export function Profile() {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-foreground mb-2">
                 {profile.display_name || 'Anonymous'}
               </h1>
               {profile.bio && (
-                <p className="text-gray-600 mb-4">{profile.bio}</p>
+                <p className="text-muted-foreground mb-4">{profile.bio}</p>
               )}
-              <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                 {profile.school_name && (
                   <span className="flex items-center">
                     <Calendar className="w-4 h-4 mr-1" />
@@ -368,7 +368,7 @@ export function Profile() {
           <CardContent>
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
-                <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="display_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Display Name
                 </label>
                 <Input
@@ -379,7 +379,7 @@ export function Profile() {
               </div>
 
               <div>
-                <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Bio
                 </label>
                 <Textarea
@@ -391,7 +391,7 @@ export function Profile() {
               </div>
 
               <div>
-                <label htmlFor="school_name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="school_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   School Name
                 </label>
                 <Input
@@ -402,7 +402,7 @@ export function Profile() {
               </div>
 
               <div>
-                <label htmlFor="course_name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="course_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Course Name
                 </label>
                 <Input
@@ -413,7 +413,7 @@ export function Profile() {
               </div>
 
               <div>
-                <label htmlFor="privacy_level" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="privacy_level" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Privacy Level
                 </label>
                 <select
@@ -440,11 +440,11 @@ export function Profile() {
 
             {/* Pending Friend Requests */}
             {pendingRequests.length > 0 && (
-              <div className="mt-6 pt-6 border-t">
-                <h3 className="font-semibold mb-4">Pending Friend Requests</h3>
+              <div className="mt-6 pt-6 border-t border-border">
+                <h3 className="font-semibold mb-4 text-foreground">Pending Friend Requests</h3>
                 <div className="space-y-3">
                   {pendingRequests.map((req) => (
-                    <div key={req.id} className="flex items-center justify-between p-3 border rounded-md">
+                    <div key={req.id} className="flex items-center justify-between p-3 border border-border rounded-md bg-card">
                       <div className="flex items-center space-x-3">
                         <Avatar
                           src={(req.requester as UserProfile)?.avatar_url || undefined}
@@ -452,8 +452,8 @@ export function Profile() {
                           className="w-10 h-10"
                         />
                         <div>
-                          <p className="font-medium text-gray-900">{(req.requester as UserProfile)?.display_name || 'Anonymous'}</p>
-                          <p className="text-xs text-gray-500">sent you a friend request</p>
+                          <p className="font-medium text-foreground">{(req.requester as UserProfile)?.display_name || 'Anonymous'}</p>
+                          <p className="text-xs text-muted-foreground">sent you a friend request</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -484,16 +484,16 @@ export function Profile() {
             )}
 
             {/* Wallet Information */}
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="font-semibold mb-4">Wallet Information</h3>
+            <div className="mt-6 pt-6 border-t border-border">
+              <h3 className="font-semibold mb-4 text-foreground">Wallet Information</h3>
               <div className="space-y-2">
                 <div>
-                  <p className="text-sm text-gray-500">Wallet Address</p>
-                  <p className="font-mono text-sm text-gray-900 break-all">{profile.wallet_address}</p>
+                  <p className="text-sm text-muted-foreground">Wallet Address</p>
+                  <p className="font-mono text-sm text-foreground break-all">{profile.wallet_address}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Is Organizer</p>
-                  <p className="text-sm text-gray-900">{profile.is_organizer ? 'Yes' : 'No'}</p>
+                  <p className="text-sm text-muted-foreground">Is Organizer</p>
+                  <p className="text-sm text-foreground">{profile.is_organizer ? 'Yes' : 'No'}</p>
                 </div>
               </div>
             </div>
@@ -507,10 +507,10 @@ export function Profile() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Skill Points</p>
-                <p className="text-3xl font-bold text-gray-900">{profile.skill_points}</p>
+                <p className="text-sm text-muted-foreground">Skill Points</p>
+                <p className="text-3xl font-bold text-foreground">{profile.skill_points}</p>
               </div>
-              <Award className="w-10 h-10 text-[#ff3800]" />
+              <Award className="w-10 h-10 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -519,8 +519,8 @@ export function Profile() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Achievements</p>
-                <p className="text-3xl font-bold text-gray-900">{achievements.length}</p>
+                <p className="text-sm text-muted-foreground">Achievements</p>
+                <p className="text-3xl font-bold text-foreground">{achievements.length}</p>
               </div>
             </div>
           </CardContent>
@@ -529,11 +529,11 @@ export function Profile() {
 
       {/* Achievements Grid */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Achievements</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-4">Achievements</h2>
         {achievements.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
-              <p className="text-gray-500">No achievements yet.</p>
+              <p className="text-muted-foreground">No achievements yet.</p>
             </CardContent>
           </Card>
         ) : (

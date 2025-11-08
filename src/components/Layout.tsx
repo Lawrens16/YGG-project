@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Home, User, Award, LogOut, Calendar, Shield, Users, Search, X } from 'lucide-react';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Home, User, Award, LogOut, Calendar, Shield, Users, Search, X, Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { OfflineIndicator } from './OfflineIndicator';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, disconnect } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,9 +69,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50/30">
+    <div className="min-h-screen bg-background">
       <OfflineIndicator />
-      <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-200/50 shadow-soft">
+      <nav className="sticky top-0 z-50 bg-card/95 backdrop-blur-lg border-b border-border shadow-soft">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 gap-4">
             <Link to="/" className="flex items-center space-x-2 flex-shrink-0 group">
@@ -80,13 +82,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className="w-8 h-8 transition-transform duration-200 group-hover:scale-110"
                 />
               </div>
-              <span className="font-bold text-xl text-gray-900 group-hover:text-primary transition-colors">SpotMe</span>
+              <span className="font-bold text-xl text-foreground group-hover:text-primary transition-colors">SpotMe</span>
             </Link>
             
             {/* Search Bar */}
             <div ref={searchRef} className="hidden md:flex flex-1 max-w-md relative">
               <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={inputRef}
                   type="text"
@@ -103,7 +105,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       setShowResults(false);
                       inputRef.current?.focus();
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -112,16 +114,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
               
               {/* Search Results Dropdown */}
               {showResults && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto z-50">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-80 overflow-y-auto z-50">
                   {isSearching ? (
-                    <div className="p-4 text-center text-gray-500">Searching...</div>
+                    <div className="p-4 text-center text-muted-foreground">Searching...</div>
                   ) : searchResults.length > 0 ? (
                     <div className="py-1">
                       {searchResults.map((result) => (
                         <button
                           key={result.id}
                           onClick={() => handleUserSelect(result.id)}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left"
                         >
                           <Avatar
                             src={result.avatar_url || undefined}
@@ -129,11 +131,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                             className="h-10 w-10"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-900 truncate">
+                            <div className="font-medium text-foreground truncate">
                               {result.display_name || 'Anonymous User'}
                             </div>
                             {result.school_name && (
-                              <div className="text-sm text-gray-500 truncate">
+                              <div className="text-sm text-muted-foreground truncate">
                                 {result.school_name}
                                 {result.course_name && ` • ${result.course_name}`}
                               </div>
@@ -143,13 +145,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       ))}
                     </div>
                   ) : (
-                    <div className="p-4 text-center text-gray-500">No users found</div>
+                    <div className="p-4 text-center text-muted-foreground">No users found</div>
                   )}
                 </div>
               )}
             </div>
 
             <div className="flex items-center space-x-4 flex-shrink-0">
+              <Button variant="ghost" size="icon" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
+                {theme === 'dark' ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
+              </Button>
               {user ? (
                 <>
                   <Link to={`/profile/${user.id}`}>
@@ -170,7 +179,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Bottom Navigation for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200/50 shadow-soft lg:hidden z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-lg border-t border-border shadow-soft lg:hidden z-50">
         <div className="grid grid-cols-5 gap-1 p-1">
           <NavLink to="/feed" icon={Home} label="Feed" isActive={isActive('/feed')} />
           <NavLink to="/events" icon={Calendar} label="Events" isActive={isActive('/events') || location.pathname.startsWith('/events/')} />
@@ -190,7 +199,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block fixed left-0 top-16 bottom-0 w-64 bg-white/95 backdrop-blur-lg border-r border-gray-200/50 shadow-soft">
+      <aside className="hidden lg:block fixed left-0 top-16 bottom-0 w-64 bg-card/95 backdrop-blur-lg border-r border-border shadow-soft">
         <div className="p-4 space-y-1">
           <NavLink to="/feed" icon={Home} label="Feed" isActive={isActive('/feed')} />
           <NavLink to="/events" icon={Calendar} label="Events" isActive={isActive('/events') || location.pathname.startsWith('/events/')} />
@@ -220,8 +229,8 @@ function NavLink({ to, icon: Icon, label, isActive }: { to: string; icon: any; l
       to={to}
       className={`flex flex-col items-center justify-center py-3 px-4 space-y-1 rounded-xl transition-all duration-200 ${
         isActive
-          ? 'text-primary bg-orange-50 shadow-sm'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50/50'
+          ? 'text-primary bg-primary/10 shadow-sm dark:bg-primary/20'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
       }`}
     >
       <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'text-primary scale-110' : 'group-hover:scale-105'}`} />

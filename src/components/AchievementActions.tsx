@@ -111,26 +111,26 @@ export function AchievementActions({ achievement, onUpdate }: AchievementActions
   };
 
   return (
-    <div className="pt-4 border-t border-gray-200">
+    <div className="pt-4 border-t border-border">
       <div className="flex items-center space-x-4 mb-3">
         <button
           onClick={handleLike}
           disabled={loadingReaction}
-          className="flex items-center space-x-2 hover:bg-gray-100 rounded-md px-2 py-1 transition-colors disabled:opacity-50"
+          className="flex items-center space-x-2 hover:bg-muted rounded-md px-2 py-1 transition-colors disabled:opacity-50 text-foreground"
           type="button"
         >
           <motion.div
             animate={{ scale: liked ? 1.2 : 1 }}
             transition={{ type: 'spring', stiffness: 500 }}
           >
-            <Heart className={`w-5 h-5 ${liked ? 'fill-red-500 text-red-500' : ''}`} />
+            <Heart className={`w-5 h-5 ${liked ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
           </motion.div>
-          <span>{likeCount > 0 ? likeCount : ''}</span>
+          <span className="text-muted-foreground">{likeCount > 0 ? likeCount : ''}</span>
         </button>
 
         <button
           onClick={toggleComments}
-          className="flex items-center space-x-2 hover:bg-gray-100 rounded-md px-2 py-1 transition-colors"
+          className="flex items-center space-x-2 hover:bg-muted rounded-md px-2 py-1 transition-colors text-muted-foreground"
           type="button"
         >
           <MessageCircle className="w-5 h-5" />
@@ -141,7 +141,7 @@ export function AchievementActions({ achievement, onUpdate }: AchievementActions
       {showComments && (
         <div className="mt-3 space-y-3">
           {loadingComments ? (
-            <div className="text-center py-4 text-gray-500 text-sm">Loading comments...</div>
+            <div className="text-center py-4 text-muted-foreground text-sm">Loading comments...</div>
           ) : (
             <>
               {comments.map((comment) => (
@@ -152,13 +152,13 @@ export function AchievementActions({ achievement, onUpdate }: AchievementActions
                     className="h-8 w-8"
                   />
                   <div className="flex-1">
-                    <div className="bg-gray-100 rounded-lg p-2">
-                      <div className="font-semibold text-sm">
+                    <div className="bg-muted rounded-lg p-2">
+                      <div className="font-semibold text-sm text-foreground">
                         {comment.user_profiles?.display_name || 'User'}
                       </div>
-                      <div className="text-sm">{comment.content}</div>
+                      <div className="text-sm text-foreground">{comment.content}</div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1 ml-2">
+                    <div className="text-xs text-muted-foreground mt-1 ml-2">
                       {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
                     </div>
                   </div>

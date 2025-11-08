@@ -14,12 +14,12 @@ interface AchievementCardProps {
 
 export function AchievementCard({ achievement, showActions = true }: AchievementCardProps) {
   const categoryColors: Record<string, string> = {
-    academic: 'bg-blue-100 text-blue-700',
-    leadership: 'bg-purple-100 text-purple-700',
-    technology: 'bg-green-100 text-green-700',
-    community: 'bg-orange-100 text-orange-700',
-    sports: 'bg-red-100 text-red-700',
-    arts: 'bg-pink-100 text-pink-700',
+    academic: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+    leadership: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+    technology: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+    community: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300',
+    sports: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+    arts: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300',
   };
 
   return (
@@ -28,10 +28,10 @@ export function AchievementCard({ achievement, showActions = true }: Achievement
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      <Card className="overflow-hidden hover:shadow-elevated transition-shadow">
         <CardContent className="p-0">
           {achievement.image_url && (
-            <div className="w-full h-64 bg-gray-200 overflow-hidden">
+            <div className="w-full h-64 bg-muted overflow-hidden">
               <img
                 src={achievement.image_url}
                 alt={achievement.title}
@@ -48,10 +48,10 @@ export function AchievementCard({ achievement, showActions = true }: Achievement
                   alt={achievement.user_profiles?.display_name || 'User'}
                 />
                 <div>
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-foreground">
                     {achievement.user_profiles?.display_name || 'Anonymous'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {formatDateTime(achievement.created_at)}
                   </p>
                 </div>
@@ -76,31 +76,31 @@ export function AchievementCard({ achievement, showActions = true }: Achievement
               </Badge>
             </div>
 
-            <Badge className={`mb-3 ${categoryColors[achievement.category] || 'bg-gray-100 text-gray-700'}`}>
+            <Badge className={`mb-3 ${categoryColors[achievement.category] || 'bg-muted text-muted-foreground'}`}>
               {achievement.category}
             </Badge>
 
-            <h3 className="text-xl font-bold text-gray-900 mb-2">{achievement.title}</h3>
+            <h3 className="text-xl font-bold text-foreground mb-2">{achievement.title}</h3>
             
             {achievement.description && (
-              <p className="text-gray-600 mb-4">{achievement.description}</p>
+              <p className="text-muted-foreground mb-4">{achievement.description}</p>
             )}
 
             <div className="flex flex-wrap gap-2 mb-4">
               {achievement.gps_latitude && achievement.gps_longitude && (
-                <div className="flex items-center text-sm text-gray-500">
+                <div className="flex items-center text-sm text-muted-foreground">
                   <MapPin className="w-4 h-4 mr-1" />
                   {achievement.gps_latitude.toFixed(4)}, {achievement.gps_longitude.toFixed(4)}
                 </div>
               )}
-              <div className="flex items-center text-sm text-gray-500">
+              <div className="flex items-center text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4 mr-1" />
                 {formatDateTime(achievement.timestamp)}
               </div>
             </div>
 
             {achievement.sui_transaction_id && (
-              <div className="text-xs text-gray-400 mb-4">
+              <div className="text-xs text-muted-foreground/70 mb-4">
                 On-chain: {achievement.sui_transaction_id.slice(0, 16)}...
               </div>
             )}

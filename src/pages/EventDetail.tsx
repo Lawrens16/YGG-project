@@ -270,7 +270,7 @@ export function EventDetail() {
               </Button>
             ) : (
               <div className="space-y-4">
-                <div className="p-3 bg-green-50 text-green-800 rounded">
+                <div className="p-3 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded border border-green-200 dark:border-green-800">
                   <div className="font-semibold">Registered</div>
                   <div className="text-sm">Status: {registration.verification_status}</div>
                 </div>
@@ -280,7 +280,7 @@ export function EventDetail() {
                   </Button>
                 )}
                 {registration.verification_status === 'verified' && (
-                  <div className="p-3 bg-blue-50 text-blue-800 rounded">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded border border-blue-200 dark:border-blue-800">
                     <div className="font-semibold">Attendance Verified!</div>
                     <div className="text-sm">You will receive your badge after the event ends.</div>
                   </div>
@@ -294,7 +294,7 @@ export function EventDetail() {
               <h3 className="font-bold mb-3">Daily Attendance</h3>
               
               {hasAttendanceToday ? (
-                <div className="p-3 bg-green-50 text-green-800 rounded flex items-center gap-2">
+                <div className="p-3 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded flex items-center gap-2 border border-green-200 dark:border-green-800">
                   <CheckCircle className="h-5 w-5" />
                   <span>Attendance registered for today</span>
                 </div>
@@ -327,13 +327,13 @@ export function EventDetail() {
                   <h4 className="font-semibold text-sm mb-2">Your Attendance History</h4>
                   <div className="space-y-2">
                     {attendanceRecords.map((record) => (
-                      <div key={record.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                        <span>
+                      <div key={record.id} className="flex items-center justify-between p-2 bg-muted rounded text-sm">
+                        <span className="text-foreground">
                           {record.attendance_day 
                             ? new Date(record.attendance_day).toLocaleDateString()
                             : new Date(record.created_at).toLocaleDateString()}
                         </span>
-                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                       </div>
                     ))}
                   </div>
