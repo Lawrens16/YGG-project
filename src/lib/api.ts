@@ -500,6 +500,65 @@ export async function verifyAchievement(achievementId: string, verifierAddress: 
 }
 
 /**
+ * Reject an achievement (admin/organizer function)
+ */
+export async function rejectAchievement(achievementId: string): Promise<Achievement> {
+  if (!isSupabaseConfigured()) {
+    const list = lsGet<Achievement[]>(LS_ACHIEVEMENTS, []);
+    const idx = list.findIndex((a) => a.id === achievementId);
+    if (idx === -1) throw new Error('Achievement not found');
+    list[idx] = {
+      ...list[idx],
+      status: 'rejected',
+      updated_at: new Date().toISOString(),
+    };
+    lsSet(LS_ACHIEVEMENTS, list);
+    return list[idx];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('achievements')
+      .update({
+        status: 'rejected',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', achievementId)
+      .select()
+      .single();
+    if (error) {
+      if (shouldMockOnError(error)) {
+        const list = lsGet<Achievement[]>(LS_ACHIEVEMENTS, []);
+        const idx = list.findIndex((a) => a.id === achievementId);
+        if (idx === -1) throw new Error('Achievement not found');
+        list[idx] = {
+          ...list[idx],
+          status: 'rejected',
+          updated_at: new Date().toISOString(),
+        };
+        lsSet(LS_ACHIEVEMENTS, list);
+        return list[idx];
+      }
+      throw error;
+    }
+    return data;
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const list = lsGet<Achievement[]>(LS_ACHIEVEMENTS, []);
+      const idx = list.findIndex((a) => a.id === achievementId);
+      if (idx === -1) throw new Error('Achievement not found');
+      list[idx] = {
+        ...list[idx],
+        status: 'rejected',
+        updated_at: new Date().toISOString(),
+      };
+      lsSet(LS_ACHIEVEMENTS, list);
+      return list[idx];
+    }
+    throw e;
+  }
+}
+
+/**
  * Delete an achievement (post) - only if user owns it
  */
 export async function deleteAchievement(achievementId: string, userId: string): Promise<void> {

@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserProfile, listPendingFriendRequests, acceptFriendRequest, rejectFriendRequest } from '@/lib/api';
+import { updateUserProfile, listPendingFriendRequests, acceptFriendRequest, rejectFriendRequest, applyForOrganizer } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar } from '@/components/ui/avatar';
+import { Switch } from '@/components/ui/switch';
+import { Code, AlertTriangle, Users, CheckCircle, XCircle, Clock, Send } from 'lucide-react';
 import type { UserProfile } from '@/types';
 
 export function Settings() {
-  const { user, updateUser, loading } = useAuth();
+  const { user, updateUser, loading, walletAddress, adoptWalletAddress } = useAuth();
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     display_name: user?.display_name || '',
@@ -20,6 +22,11 @@ export function Settings() {
   });
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [devMode, setDevMode] = useState(() => {
+    return localStorage.getItem('dev_mode_skip_verification') === 'true';
+  });
+  const [applying, setApplying] = useState(false);
+  const [applicationReason, setApplicationReason] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -69,6 +76,28 @@ export function Settings() {
       alert('Failed to update profile. Please try again.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleApply() {
+    if (!user || !walletAddress) return;
+    
+    setApplying(true);
+    try {
+      await applyForOrganizer(user.id, {
+        reason: applicationReason,
+      });
+      
+      // Reload user data to get updated application status
+      await adoptWalletAddress(walletAddress);
+      
+      alert('Application submitted successfully! Your application is now pending review by an administrator.');
+      setApplicationReason('');
+    } catch (error: any) {
+      console.error('Error submitting application:', error);
+      alert(`Failed to submit application: ${error.message || 'Unknown error'}`);
+    } finally {
+      setApplying(false);
     }
   }
 
@@ -180,6 +209,135 @@ export function Settings() {
         </CardContent>
       </Card>
 
+      {/* Organizer Application */}
+      {!user.is_organizer && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Become a Verified Organizer
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {user.organizer_application_status === 'pending' && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <p className="font-semibold text-blue-900 dark:text-blue-100">Application Pending</p>
+                  </div>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    Your application to become a verified organizer is currently under review. 
+                    You will be notified once an administrator reviews your application.
+                  </p>
+                </div>
+              )}
+
+              {user.organizer_application_status === 'approved' && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <p className="font-semibold text-green-900 dark:text-green-100">Application Approved</p>
+                  </div>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    Congratulations! Your organizer application has been approved. 
+                    You can now create and manage events.
+                  </p>
+                </div>
+              )}
+
+              {user.organizer_application_status === 'rejected' && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    <p className="font-semibold text-red-900 dark:text-red-100">Application Rejected</p>
+                  </div>
+                  <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                    Your organizer application was not approved. You can submit a new application if you'd like.
+                  </p>
+                  <Button
+                    onClick={handleApply}
+                    disabled={applying}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {applying ? 'Submitting...' : 'Submit New Application'}
+                  </Button>
+                </div>
+              )}
+
+              {!user.organizer_application_status && (
+                <>
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      As a verified organizer, you can:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 dark:text-gray-400 ml-2">
+                      <li>Create and manage events</li>
+                      <li>Verify attendee participation</li>
+                      <li>Mint custom clearance NFTs for attendees</li>
+                      <li>Issue event badges and certificates</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <label htmlFor="application_reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Why do you want to become an organizer? (Optional)
+                    </label>
+                    <Textarea
+                      id="application_reason"
+                      value={applicationReason}
+                      onChange={(e) => setApplicationReason(e.target.value)}
+                      rows={4}
+                      placeholder="Tell us about your event organizing experience, planned events, or any other relevant information..."
+                      className="mb-3"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleApply}
+                    disabled={applying}
+                    className="w-full"
+                  >
+                    {applying ? (
+                      'Submitting Application...'
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Apply to Become an Organizer
+                      </>
+                    )}
+                  </Button>
+
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Your application will be reviewed by an administrator. You'll be notified of the decision.
+                  </p>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Already an Organizer */}
+      {user.is_organizer && (
+        <Card className="mt-6 border-green-200 dark:border-green-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              Verified Organizer
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <p className="text-sm text-green-700 dark:text-green-300">
+                You are a verified organizer! You can create and manage events from the Organizer Dashboard.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="mt-6">
         <CardHeader>
           <CardTitle>Pending Friend Requests</CardTitle>
@@ -229,6 +387,40 @@ export function Settings() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Dev Settings */}
+      <Card className="mt-6 border-yellow-200 dark:border-yellow-800">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Code className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            Developer Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                  <p className="font-medium text-yellow-900 dark:text-yellow-100">
+                    Skip Image Verification Constraints
+                  </p>
+                </div>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  When enabled, GPS and timestamp verification will be bypassed for testing purposes.
+                </p>
+              </div>
+              <Switch
+                checked={devMode}
+                onCheckedChange={(checked) => {
+                  setDevMode(checked);
+                  localStorage.setItem('dev_mode_skip_verification', checked ? 'true' : 'false');
+                }}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Home, User, Award, LogOut, Calendar, Shield, Users, Search, X, Sun, Moon } from 'lucide-react';
+import { Home, User, Award, LogOut, Calendar, Shield, Users, Search, X, Sun, Moon, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
@@ -164,7 +164,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Link to={`/profile/${user.id}`}>
                     <Avatar src={user.avatar_url || undefined} alt={user.display_name || 'User'} />
                   </Link>
-                  <Button variant="ghost" size="icon" onClick={disconnect}>
+                  <Link to="/settings">
+                    <Button variant="ghost" size="icon" title="Settings">
+                      <Settings className="w-5 h-5" />
+                    </Button>
+                  </Link>
+                  <Button variant="ghost" size="icon" onClick={disconnect} title="Disconnect">
                     <LogOut className="w-5 h-5" />
                   </Button>
                 </>
@@ -210,6 +215,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <NavLink to="/admin" icon={Shield} label="Admin Panel" isActive={isActive('/admin')} />
           )}
           <NavLink to="/rewards" icon={Award} label="Rewards & Points" isActive={isActive('/rewards')} />
+          {user && (
+            <NavLink to="/settings" icon={Settings} label="Settings" isActive={isActive('/settings')} />
+          )}
         </div>
       </aside>
 

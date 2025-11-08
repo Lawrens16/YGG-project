@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { QRCodeGenerator } from '@/components/QRCodeGenerator';
 import { CameraVerification } from '@/components/CameraVerification';
 import { AttendanceUpload } from '@/components/AttendanceUpload';
-import { MapPin, Calendar, Users, Code, CheckCircle, XCircle, Camera } from 'lucide-react';
+import { BatchMintClearances } from '@/components/BatchMintClearances';
+import { MapPin, Calendar, Users, Code, CheckCircle, XCircle, Camera, Gift } from 'lucide-react';
 import { format } from 'date-fns';
 import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
+import { getOrganizerCap, getDeveloperTreasury } from '@/lib/sui';
 
 export function EventDetail() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +27,10 @@ export function EventDetail() {
   const [attendanceRecords, setAttendanceRecords] = useState<Achievement[]>([]);
   const [allAttendanceRecords, setAllAttendanceRecords] = useState<Achievement[]>([]);
   const [showAttendanceUpload, setShowAttendanceUpload] = useState(false);
+  const [showBatchMint, setShowBatchMint] = useState(false);
+  const [organizerCapObjectId, setOrganizerCapObjectId] = useState<string | null>(null);
+  const [treasuryObjectId, setTreasuryObjectId] = useState<string | null>(null);
+  const [loadingObjectIds, setLoadingObjectIds] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -60,12 +66,34 @@ export function EventDetail() {
           const allAchievements = await getAchievements({});
           const eventAttendance = allAchievements.filter((a: Achievement) => a.event_id === id && a.image_url);
           setAllAttendanceRecords(eventAttendance);
+          
+          // Load organizer cap and treasury IDs
+          await loadObjectIds(user.wallet_address);
         }
       }
     } catch (error) {
       console.error('Error loading event:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadObjectIds = async (organizerWalletAddress: string) => {
+    if (!organizerWalletAddress || organizerWalletAddress === '0x0') return;
+    
+    setLoadingObjectIds(true);
+    try {
+      // Fetch organizer's cap
+      const capId = await getOrganizerCap(organizerWalletAddress);
+      setOrganizerCapObjectId(capId);
+      
+      // Fetch treasury (try with organizer address first, then fallback to env)
+      const treasuryId = await getDeveloperTreasury();
+      setTreasuryObjectId(treasuryId);
+    } catch (error) {
+      console.error('Error loading object IDs:', error);
+    } finally {
+      setLoadingObjectIds(false);
     }
   };
 
@@ -126,16 +154,17 @@ export function EventDetail() {
     return <div className="p-4 text-center">Event not found</div>;
   }
 
-  const canVerify = registration && 
-    new Date(event.end_date) <= new Date() &&
-    new Date(event.end_date).getTime() - Date.now() <= 30 * 60 * 1000; // 30 minutes before end
-
   const eventEnded = new Date(event.end_date) < new Date();
   
   // Check if event is currently active
   const eventIsActive = event && 
     new Date(event.start_date) <= new Date() && 
     new Date(event.end_date) >= new Date();
+
+  // Can verify if registered and event has started (ongoing or finished)
+  const canVerify = registration && 
+    registration.verification_status === 'registered' &&
+    new Date(event.start_date) <= new Date();
 
   // Check if user has already registered attendance today
   const hasAttendanceToday = attendanceRecords.some(record => {
@@ -231,11 +260,20 @@ export function EventDetail() {
                 ))}
               </div>
             </div>
-            {eventEnded && (
-              <Button onClick={handleIssueBadges} className="w-full">
-                Issue Badges to Verified Attendees
+            <div className="flex flex-col gap-2">
+              <Button 
+                onClick={() => setShowBatchMint(true)} 
+                className="w-full bg-[#ff3800] hover:bg-[#ff5500]"
+              >
+                <Gift className="h-4 w-4 mr-2" />
+                Distribute Clearances (NFTs)
               </Button>
-            )}
+              {eventEnded && (
+                <Button onClick={handleIssueBadges} className="w-full" variant="outline">
+                  Issue Badges to Verified Attendees
+                </Button>
+              )}
+            </div>
             {allAttendanceRecords.length > 0 && (
               <div>
                 <h3 className="font-semibold mb-2">Attendance Pictures ({allAttendanceRecords.length})</h3>
@@ -276,6 +314,7 @@ export function EventDetail() {
                 </div>
                 {registration.verification_status === 'registered' && canVerify && (
                   <Button onClick={() => setShowCamera(true)} className="w-full">
+                    <Camera className="h-4 w-4 mr-2" />
                     Verify Attendance
                   </Button>
                 )}
@@ -289,9 +328,10 @@ export function EventDetail() {
             )}
           </Card>
 
-          {registration && eventIsActive && (
+          {/* Daily attendance tracking for ongoing events (separate from verification) */}
+          {registration && eventIsActive && registration.verification_status === 'verified' && (
             <Card className="p-4 mt-4">
-              <h3 className="font-bold mb-3">Daily Attendance</h3>
+              <h3 className="font-bold mb-3">Daily Attendance Tracking</h3>
               
               {hasAttendanceToday ? (
                 <div className="p-3 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded flex items-center gap-2 border border-green-200 dark:border-green-800">
@@ -349,6 +389,20 @@ export function EventDetail() {
           event={event}
           onVerify={handleVerify}
           onClose={() => setShowCamera(false)}
+        />
+      )}
+
+      {showBatchMint && event && (
+        <BatchMintClearances
+          eventId={event.id}
+          eventName={event.name}
+          registrations={registrations}
+          organizerCapObjectId={organizerCapObjectId || '0x0'}
+          treasuryObjectId={treasuryObjectId || '0x0'}
+          onSuccess={() => {
+            loadEvent();
+          }}
+          onClose={() => setShowBatchMint(false)}
         />
       )}
     </div>

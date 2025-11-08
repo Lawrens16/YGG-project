@@ -22,12 +22,58 @@ const GPS_TOLERANCE_METERS = 100; // 100 meters radius
 const VERIFICATION_WINDOW_MINUTES = 30; // 30 minutes before event end
 
 /**
+ * Check if dev mode is enabled (skips verification constraints)
+ */
+function isDevModeEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('dev_mode_skip_verification') === 'true';
+}
+
+/**
  * Verify event attendance based on photo EXIF data
  */
 export async function verifyEventAttendance(
   photo: File,
   eventDetails: EventDetails
 ): Promise<VerificationResult> {
+  const skipConstraints = isDevModeEnabled();
+  
+  // If dev mode is enabled, bypass all constraints
+  if (skipConstraints) {
+    try {
+      const exif = await exifr.parse(photo, {
+        gps: true,
+        exif: true,
+        ifd0: {},
+      });
+
+      const photoLat = exif?.latitude;
+      const photoLng = exif?.longitude;
+      const photoTimestamp = exif?.DateTimeOriginal 
+        ? new Date(exif.DateTimeOriginal)
+        : exif?.CreateDate 
+        ? new Date(exif.CreateDate)
+        : null;
+
+      return {
+        isValid: true,
+        reasons: ['[DEV MODE] All verification constraints bypassed'],
+        confidence: 100,
+        gpsData: photoLat && photoLng ? { latitude: photoLat, longitude: photoLng } : undefined,
+        timestamp: photoTimestamp || undefined,
+      };
+    } catch (error) {
+      // Even in dev mode, if we can't parse the photo, return valid with current time/location
+      return {
+        isValid: true,
+        reasons: ['[DEV MODE] Verification bypassed - using fallback data'],
+        confidence: 100,
+        gpsData: { latitude: eventDetails.venueLatitude, longitude: eventDetails.venueLongitude },
+        timestamp: new Date(),
+      };
+    }
+  }
+
   const reasons: string[] = [];
   let confidence = 0;
 

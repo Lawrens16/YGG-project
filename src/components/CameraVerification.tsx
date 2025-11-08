@@ -94,11 +94,14 @@ export function CameraVerification({ event, onVerify, onClose }: CameraVerificat
         const gpsData = await extractGPSFromPhoto(capturedPhoto);
         const timestamp = await extractTimestampFromPhoto(capturedPhoto);
         
-        if (gpsData && timestamp) {
-          onVerify(capturedPhoto, gpsData, timestamp);
-        } else {
-          alert('Could not extract GPS or timestamp from photo');
-        }
+        // Use extracted data or fallback to event location/current time
+        const finalGpsData = gpsData || result.gpsData || {
+          latitude: eventDetails.venueLatitude,
+          longitude: eventDetails.venueLongitude,
+        };
+        const finalTimestamp = timestamp || result.timestamp || new Date();
+        
+        onVerify(capturedPhoto, finalGpsData, finalTimestamp);
       }
     } catch (error) {
       console.error('Verification error:', error);
@@ -113,6 +116,13 @@ export function CameraVerification({ event, onVerify, onClose }: CameraVerificat
     setPreview(null);
     setVerificationResult(null);
     stopCamera();
+  };
+
+  const goBackToCamera = () => {
+    setCapturedPhoto(null);
+    setPreview(null);
+    setVerificationResult(null);
+    // Don't stop camera - let user start it again if needed
   };
 
   return (
@@ -152,13 +162,6 @@ export function CameraVerification({ event, onVerify, onClose }: CameraVerificat
             >
               Select Photo from Gallery
             </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
           </div>
         ) : (
           <div className="space-y-4">
@@ -197,20 +200,46 @@ export function CameraVerification({ event, onVerify, onClose }: CameraVerificat
 
             <div className="flex gap-2">
               {!verificationResult && (
-                <Button
-                  onClick={verifyPhoto}
-                  disabled={verifying}
-                  className="flex-1"
-                >
-                  {verifying ? 'Verifying...' : 'Verify Photo'}
-                </Button>
+                <>
+                  <Button
+                    onClick={verifyPhoto}
+                    disabled={verifying}
+                    className="flex-1"
+                  >
+                    {verifying ? 'Verifying...' : 'Verify Photo'}
+                  </Button>
+                  <Button variant="outline" onClick={goBackToCamera} className="flex-1">
+                    <Camera className="h-4 w-4 mr-2" />
+                    Take Photo
+                  </Button>
+                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1">
+                    Choose Different
+                  </Button>
+                </>
               )}
-              <Button variant="outline" onClick={reset} className="flex-1">
-                Retake
-              </Button>
+              {verificationResult && (
+                <>
+                  <Button variant="outline" onClick={goBackToCamera} className="flex-1">
+                    <Camera className="h-4 w-4 mr-2" />
+                    Take New Photo
+                  </Button>
+                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1">
+                    Choose Different
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}
+
+        {/* Single file input used throughout */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
 
         <Button variant="outline" onClick={onClose} className="w-full mt-4">
           Cancel

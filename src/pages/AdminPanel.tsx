@@ -6,12 +6,17 @@ import {
   rejectOrganizer,
   getAllEvents,
   updateEventFeaturedStatus,
+  getAchievements,
+  verifyAchievement,
+  rejectAchievement,
 } from '@/lib/api';
-import type { UserProfile, Event } from '@/types';
+import { registerOrganizer } from '@/lib/sui';
+import type { UserProfile, Event, Achievement } from '@/types';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, X, Users, Calendar, Award, Star } from 'lucide-react';
+import { AchievementCard } from '@/components/AchievementCard';
+import { Check, X, Users, Calendar, Award, Star, Shield, Loader2 } from 'lucide-react';
 
 interface EventFeaturedControlsProps {
   event: Event;
@@ -118,11 +123,14 @@ function EventFeaturedControls({ event, onUpdate }: EventFeaturedControlsProps) 
 }
 
 export function AdminPanel() {
-  const { user } = useAuth();
+  const { user, walletAddress } = useAuth();
   const [pendingApplications, setPendingApplications] = useState<UserProfile[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [pendingAchievements, setPendingAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'applications' | 'events' | 'analytics'>('applications');
+  const [activeTab, setActiveTab] = useState<'applications' | 'events' | 'achievements' | 'analytics'>('applications');
+  const [verifying, setVerifying] = useState<Set<string>>(new Set());
+  const [registering, setRegistering] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user?.is_admin) {
@@ -133,12 +141,14 @@ export function AdminPanel() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [apps, evts] = await Promise.all([
+      const [apps, evts, achievements] = await Promise.all([
         getPendingOrganizerApplications(),
         getAllEvents({ limit: 50 }),
+        getAchievements({ status: 'pending' }),
       ]);
       setPendingApplications(apps);
       setEvents(evts);
+      setPendingAchievements(achievements as Achievement[]);
     } catch (error) {
       console.error('Error loading admin data:', error);
     } finally {
@@ -146,9 +156,34 @@ export function AdminPanel() {
     }
   };
 
-  const handleApprove = async (userId: string) => {
+  const handleApprove = async (userId: string, walletAddress: string) => {
     try {
+      // First approve in database
       await approveOrganizer(userId);
+      
+      // Then register on-chain if wallet address is available
+      if (walletAddress && walletAddress !== '0x0') {
+        setRegistering(prev => new Set(prev).add(userId));
+        try {
+          const result = await registerOrganizer(walletAddress);
+          console.log('Organizer registered on-chain:', result);
+          if (result.created) {
+            alert(`Organizer approved and registered on-chain successfully!\n\nOrganizerCap Object ID: ${result.created}\n\nPlease save this ID - the organizer will need it to mint clearances.`);
+          } else {
+            alert('Organizer approved and registered on-chain successfully!');
+          }
+        } catch (onChainError: any) {
+          console.error('Error registering on-chain:', onChainError);
+          alert(`Organizer approved in database, but on-chain registration failed.\n\nError: ${onChainError.message || 'Unknown error'}\n\nYou can register them manually later.`);
+        } finally {
+          setRegistering(prev => {
+            const next = new Set(prev);
+            next.delete(userId);
+            return next;
+          });
+        }
+      }
+      
       await loadData();
     } catch (error) {
       console.error('Error approving organizer:', error);
@@ -157,12 +192,58 @@ export function AdminPanel() {
   };
 
   const handleReject = async (userId: string) => {
+    if (!confirm('Are you sure you want to reject this organizer application?')) {
+      return;
+    }
     try {
       await rejectOrganizer(userId);
       await loadData();
     } catch (error) {
       console.error('Error rejecting organizer:', error);
       alert('Error rejecting organizer');
+    }
+  };
+
+  const handleVerifyAchievement = async (achievementId: string) => {
+    if (!walletAddress) {
+      alert('Please connect your wallet to verify achievements');
+      return;
+    }
+
+    setVerifying(prev => new Set(prev).add(achievementId));
+    try {
+      await verifyAchievement(achievementId, walletAddress);
+      await loadData();
+    } catch (error) {
+      console.error('Error verifying achievement:', error);
+      alert('Error verifying achievement');
+    } finally {
+      setVerifying(prev => {
+        const next = new Set(prev);
+        next.delete(achievementId);
+        return next;
+      });
+    }
+  };
+
+  const handleRejectAchievement = async (achievementId: string) => {
+    if (!confirm('Are you sure you want to reject this achievement?')) {
+      return;
+    }
+
+    setVerifying(prev => new Set(prev).add(achievementId));
+    try {
+      await rejectAchievement(achievementId);
+      await loadData();
+    } catch (error) {
+      console.error('Error rejecting achievement:', error);
+      alert('Error rejecting achievement');
+    } finally {
+      setVerifying(prev => {
+        const next = new Set(prev);
+        next.delete(achievementId);
+        return next;
+      });
     }
   };
 
@@ -195,6 +276,7 @@ export function AdminPanel() {
     upcomingEvents: events.filter(e => e.status === 'upcoming').length,
     completedEvents: events.filter(e => e.status === 'completed').length,
     pendingApplications: pendingApplications.length,
+    pendingAchievements: pendingAchievements.length,
   };
 
   return (
@@ -207,6 +289,13 @@ export function AdminPanel() {
           onClick={() => setActiveTab('applications')}
         >
           Applications ({pendingApplications.length})
+        </Button>
+        <Button
+          variant={activeTab === 'achievements' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('achievements')}
+        >
+          <Shield className="h-4 w-4 mr-2" />
+          Verify Achievements ({pendingAchievements.length})
         </Button>
         <Button
           variant={activeTab === 'events' ? 'default' : 'ghost'}
@@ -232,29 +321,88 @@ export function AdminPanel() {
             pendingApplications.map((app) => (
               <Card key={app.id} className="p-4">
                 <div className="flex justify-between items-start">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-bold">{app.display_name || 'Unknown'}</h3>
-                    <p className="text-sm text-gray-500">{app.wallet_address}</p>
-                    {app.bio && <p className="mt-2">{app.bio}</p>}
+                    <p className="text-sm text-gray-500 font-mono">{app.wallet_address}</p>
+                    {app.bio && <p className="mt-2 text-sm">{app.bio}</p>}
+                    {app.school_name && (
+                      <p className="text-sm text-gray-600 mt-1">School: {app.school_name}</p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => handleApprove(app.id)}
+                      onClick={() => handleApprove(app.id, app.wallet_address)}
                       className="bg-green-600 hover:bg-green-700"
+                      disabled={registering.has(app.id)}
                     >
-                      <Check className="h-4 w-4 mr-1" />
-                      Approve
+                      {registering.has(app.id) ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Registering...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Approve & Register
+                        </>
+                      )}
                     </Button>
                     <Button
                       size="sm"
                       variant="destructive"
                       onClick={() => handleReject(app.id)}
+                      disabled={registering.has(app.id)}
                     >
                       <X className="h-4 w-4 mr-1" />
                       Reject
                     </Button>
                   </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === 'achievements' && (
+        <div className="space-y-4">
+          {pendingAchievements.length === 0 ? (
+            <Card className="p-8 text-center">
+              <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
+              <p className="text-gray-500">All caught up! No pending achievements to verify.</p>
+            </Card>
+          ) : (
+            pendingAchievements.map((achievement) => (
+              <Card key={achievement.id} className="overflow-hidden">
+                <AchievementCard achievement={achievement} showActions={false} />
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleRejectAchievement(achievement.id)}
+                    className="text-red-600 hover:text-red-700"
+                    disabled={verifying.has(achievement.id)}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                  <Button
+                    onClick={() => handleVerifyAchievement(achievement.id)}
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={verifying.has(achievement.id) || !walletAddress}
+                  >
+                    {verifying.has(achievement.id) ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Verify & Mint
+                      </>
+                    )}
+                  </Button>
                 </div>
               </Card>
             ))
@@ -271,7 +419,7 @@ export function AdminPanel() {
       )}
 
       {activeTab === 'analytics' && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="h-5 w-5 text-blue-600" />
@@ -299,6 +447,13 @@ export function AdminPanel() {
               <div className="text-sm text-gray-500">Pending Apps</div>
             </div>
             <div className="text-2xl font-bold">{stats.pendingApplications}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Shield className="h-5 w-5 text-red-600" />
+              <div className="text-sm text-gray-500">Pending Verify</div>
+            </div>
+            <div className="text-2xl font-bold">{stats.pendingAchievements}</div>
           </Card>
         </div>
       )}
