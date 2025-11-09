@@ -11,10 +11,9 @@ import type { Achievement } from '@/types';
 
 interface AchievementActionsProps {
   achievement: Achievement;
-  onUpdate?: () => void;
 }
 
-export function AchievementActions({ achievement, onUpdate }: AchievementActionsProps) {
+export function AchievementActions({ achievement }: AchievementActionsProps) {
   const { user } = useAuth();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);

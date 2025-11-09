@@ -11,17 +11,17 @@ import {
   Trophy,
   Target,
   CheckCircle2,
-  Circle
 } from 'lucide-react';
 import { getMilestoneProgress, pinMilestone, unpinMilestone, getUserProfile, type MilestoneProgress } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Pin, PinOff } from 'lucide-react';
+import type { UserProfile } from '@/types';
 
-const categoryIcons: Record<string, any> = {
-  participation: Calendar,
-  interaction: Users,
-};
+// const categoryIcons: Record<string, any> = {
+//   participation: Calendar,
+//   interaction: Users,
+// };
 
 const milestoneIcons: Record<string, any> = {
   new_explorer: Target,
@@ -85,16 +85,16 @@ export function Milestones() {
     try {
       if (isPinned) {
         const updatedProfile = await unpinMilestone(user.id, milestoneId);
-        const newPinned = updatedProfile.pinned_milestones || [];
+        const newPinned = (updatedProfile.pinned_milestones || []) as string[];
         setPinnedMilestones(newPinned);
         // Update user without triggering reload - only update pinned_milestones
-        updateUser({ ...user, pinned_milestones: newPinned });
+        updateUser({ ...user, pinned_milestones: newPinned } as Partial<UserProfile>);
       } else {
         const updatedProfile = await pinMilestone(user.id, milestoneId);
-        const newPinned = updatedProfile.pinned_milestones || [];
+        const newPinned = (updatedProfile.pinned_milestones || []) as string[];
         setPinnedMilestones(newPinned);
         // Update user without triggering reload - only update pinned_milestones
-        updateUser({ ...user, pinned_milestones: newPinned });
+        updateUser({ ...user, pinned_milestones: newPinned } as Partial<UserProfile>);
       }
     } catch (error) {
       console.error('Error toggling pin:', error);

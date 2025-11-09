@@ -2222,7 +2222,7 @@ export async function getMilestoneProgress(userId: string): Promise<MilestonePro
     
     // Get unique event categories from achievements
     const eventCategories = new Set<string>();
-    verifiedAchievements.forEach(a => {
+    verifiedAchievements.forEach((a: Achievement) => {
       if (a.category && a.event_id) {
         eventCategories.add(a.category);
       }
@@ -2252,41 +2252,26 @@ export async function getMilestoneProgress(userId: string): Promise<MilestonePro
     const newOrganizersCount = organizerIds.size;
     
     // Get badges earned (reuse verifiedAchievements)
-    const badgesEarned = verifiedAchievements.filter(a => a.sui_object_id).length;
+    const badgesEarned = verifiedAchievements.filter((a: Achievement) => a.sui_object_id).length;
     
     // Get friends count
     const friendsCount = friends.length;
     
     // Parallelize Supabase queries for likes and comments
-    let likesReceived = 0;
     let reviewsGiven = 0;
     
     if (isSupabaseConfigured()) {
       try {
-        // Get all user achievements for likes calculation
-        const allUserAchievements = await getAchievements({ userId });
-        const achievementIds = allUserAchievements.map(a => a.id);
+        // Get comments/reviews count
+        const commentsResult = await supabase
+          .from('comments')
+          .select('id')
+          .eq('user_id', userId)
+          .catch(() => ({ data: null, error: null }));
         
-        // Parallelize likes and comments queries
-        const [likesResult, commentsResult] = await Promise.all([
-          achievementIds.length > 0
-            ? supabase
-                .from('likes')
-                .select('id')
-                .in('achievement_id', achievementIds)
-                .catch(() => ({ data: null, error: null }))
-            : Promise.resolve({ data: [], error: null }),
-          supabase
-            .from('comments')
-            .select('id')
-            .eq('user_id', userId)
-            .catch(() => ({ data: null, error: null })),
-        ]);
-        
-        likesReceived = likesResult.data?.length || 0;
         reviewsGiven = commentsResult.data?.length || 0;
       } catch (e) {
-        console.warn('Error getting likes/reviews:', e);
+        console.warn('Error getting reviews:', e);
       }
     }
     
@@ -2454,9 +2439,9 @@ export async function pinMilestone(userId: string, milestoneId: string): Promise
     if (userIndex === -1) throw new Error('User not found');
     
     const user = users[userIndex];
-    const pinned = user.pinned_milestones || [];
+    const pinned = (user.pinned_milestones || []) as string[];
     if (!pinned.includes(milestoneId)) {
-      users[userIndex] = { ...user, pinned_milestones: [...pinned, milestoneId] };
+      users[userIndex] = { ...user, pinned_milestones: [...pinned, milestoneId] } as UserProfile;
       lsSet(LS_USERS, users);
     }
     return users[userIndex];
@@ -2501,13 +2486,13 @@ export async function pinMilestone(userId: string, milestoneId: string): Promise
       const userIndex = users.findIndex(u => u.id === userId);
       if (userIndex === -1) throw new Error('User not found');
       
-      const user = users[userIndex];
-      const pinned = user.pinned_milestones || [];
-      if (!pinned.includes(milestoneId)) {
-        users[userIndex] = { ...user, pinned_milestones: [...pinned, milestoneId] };
-        lsSet(LS_USERS, users);
-      }
-      return users[userIndex];
+    const user = users[userIndex];
+    const pinned = (user.pinned_milestones || []) as string[];
+    if (!pinned.includes(milestoneId)) {
+      users[userIndex] = { ...user, pinned_milestones: [...pinned, milestoneId] } as UserProfile;
+      lsSet(LS_USERS, users);
+    }
+    return users[userIndex];
     }
     throw e;
   }
@@ -2523,8 +2508,8 @@ export async function unpinMilestone(userId: string, milestoneId: string): Promi
     if (userIndex === -1) throw new Error('User not found');
     
     const user = users[userIndex];
-    const pinned = (user.pinned_milestones || []).filter(id => id !== milestoneId);
-    users[userIndex] = { ...user, pinned_milestones: pinned };
+    const pinned = ((user.pinned_milestones || []) as string[]).filter((id: string) => id !== milestoneId);
+    users[userIndex] = { ...user, pinned_milestones: pinned } as UserProfile;
     lsSet(LS_USERS, users);
     return users[userIndex];
   }

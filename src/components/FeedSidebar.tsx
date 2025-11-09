@@ -12,7 +12,7 @@ import type { UserProfile, Achievement, Event } from '@/types';
 export function FeedSidebar() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
+  const [_suggestions, setSuggestions] = useState<UserProfile[]>([]);
   const [recentActivity, setRecentActivity] = useState<Array<{ type: 'achievement' | 'event'; data: Achievement | Event; user?: UserProfile }>>([]);
   const [trendingEvents, setTrendingEvents] = useState<Event[]>([]);
 
@@ -28,9 +28,7 @@ export function FeedSidebar() {
     if (!user) return;
     try {
       // Get users you're not following yet (simplified - in production, use a proper suggestions API)
-      const following = await getFollowing(user.id);
-      const followingIds = new Set(following.map(f => f.followed_id));
-      
+      await getFollowing(user.id);
       // For now, we'll show a placeholder - in production, implement proper user suggestions
       setSuggestions([]);
     } catch (error) {
@@ -42,7 +40,7 @@ export function FeedSidebar() {
     if (!user) return;
     try {
       const achievements = await getFeedAchievements(user.id, 5);
-      const activity = achievements.slice(0, 5).map(a => ({
+      const activity = achievements.slice(0, 5).map((a: Achievement) => ({
         type: 'achievement' as const,
         data: a,
         user: a.user_profiles,
@@ -127,7 +125,7 @@ export function FeedSidebar() {
                 return (
                   <div key={achievement.id || index} className="flex items-start gap-3">
                     <Avatar
-                      src={activityUser?.avatar_url}
+                      src={activityUser?.avatar_url ?? undefined}
                       alt={activityUser?.display_name || 'User'}
                       className="w-10 h-10 flex-shrink-0"
                     />

@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 import type { UserProfile, Achievement } from '@/types';
-import { Pin, PinOff } from 'lucide-react';
+import { PinOff } from 'lucide-react';
 
 export function Profile() {
   const { id } = useParams();

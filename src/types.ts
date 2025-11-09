@@ -15,6 +15,7 @@ export interface UserProfile {
   is_organizer?: boolean;
   is_admin?: boolean;
   organizer_application_status?: string | null;
+  pinned_milestones?: string[] | null;
   created_at: string;
   updated_at: string;
 }
