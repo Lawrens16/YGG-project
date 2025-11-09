@@ -195,8 +195,10 @@ export function EventFeed() {
       {/* Featured Events Carousel */}
       {!featuredLoading && featuredEvents.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">Featured Events</h2>
-          <FeaturedEventCarousel events={featuredEvents} autoScrollInterval={4000} />
+          <h2 className="text-xl font-semibold mb-4 text-foreground">Featured Events</h2>
+          <div className="relative z-0">
+            <FeaturedEventCarousel events={featuredEvents} autoScrollInterval={4000} />
+          </div>
         </div>
       )}
 
@@ -330,4 +332,3 @@ export function EventFeed() {
     </div>
   );
 }
-
