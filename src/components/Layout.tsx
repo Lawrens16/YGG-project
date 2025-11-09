@@ -209,7 +209,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {user?.is_admin && (
             <NavLink to="/admin" icon={Shield} label="Admin Panel" isActive={isActive('/admin')} />
           )}
-          <NavLink to="/rewards" icon={Award} label="Rewards & Points" isActive={isActive('/rewards')} />
+          <NavLink to="/milestones" icon={Award} label="Milestones" isActive={isActive('/milestones')} />
         </div>
       </aside>
 

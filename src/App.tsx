@@ -6,7 +6,7 @@ import { Feed } from './pages/Feed';
 import { Upload } from './pages/Upload';
 import { Profile } from './pages/Profile';
 import { Verify } from './pages/Verify';
-import { Rewards } from './pages/Rewards';
+import { Milestones } from './pages/Milestones';
 import { Settings } from './pages/Settings';
 import { EventFeed } from './pages/EventFeed';
 import { EventDetail } from './pages/EventDetail';
@@ -107,12 +107,16 @@ function App() {
               }
             />
             <Route
-              path="/rewards"
+              path="/milestones"
               element={
                 <ProtectedRoute>
-                  <Rewards />
+                  <Milestones />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/rewards"
+              element={<Navigate to="/milestones" replace />}
             />
             <Route
               path="/settings"

@@ -502,7 +502,7 @@ export function FeedPost({ achievement, event, onUpdate }: FeedPostProps) {
         </div>
 
         <div className="pt-3 border-t border-border">
-          {achievement && <AchievementActions achievement={achievement} onUpdate={onUpdate} />}
+          {achievement && <AchievementActions achievement={achievement} />}
         </div>
       </div>
     </Card>
