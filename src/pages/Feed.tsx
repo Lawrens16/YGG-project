@@ -27,10 +27,11 @@ export function Feed() {
   const happeningNowScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       checkFriends();
     }
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only reload when user ID changes, not when user object reference changes
 
   useEffect(() => {
     async function loadFeatured() {
@@ -61,10 +62,11 @@ export function Feed() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       loadFeed();
     }
-  }, [user, hasFriends, feedFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, hasFriends, feedFilter]); // Only reload when user ID changes, not when user object reference changes
 
   async function checkFriends() {
     if (!user) return;

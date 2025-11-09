@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserProfile, getAchievements, isFollowing, followUser, unfollowUser, updateUserProfile, listPendingFriendRequests, acceptFriendRequest, rejectFriendRequest } from '@/lib/api';
+import { getUserProfile, getAchievements, isFollowing, followUser, unfollowUser, updateUserProfile, listPendingFriendRequests, acceptFriendRequest, rejectFriendRequest, getMilestoneProgress, unpinMilestone, type MilestoneProgress } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { AchievementCard } from '@/components/AchievementCard';
 import { Award, Calendar, UserPlus, Settings, Camera, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { uploadFile, STORAGE_BUCKETS } from '@/lib/storage';
 import type { UserProfile, Achievement } from '@/types';
+import { Pin, PinOff } from 'lucide-react';
 
 export function Profile() {
   const { id } = useParams();
@@ -501,31 +503,36 @@ export function Profile() {
         </Card>
       )}
 
-      {/* Stats */}
-      <div className="grid md:grid-cols-2 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Skill Points</p>
-                <p className="text-3xl font-bold text-foreground">{profile.skill_points}</p>
-              </div>
-              <Award className="w-10 h-10 text-primary" />
-            </div>
+      {/* Pinned Milestones */}
+      {profile.pinned_milestones && profile.pinned_milestones.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              Pinned Milestones
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PinnedMilestonesSection 
+              userId={profile.id} 
+              pinnedIds={profile.pinned_milestones} 
+              isOwnProfile={isOwnProfile}
+              onUnpin={async (milestoneId) => {
+                if (currentUser) {
+                  try {
+                    const updatedProfile = await unpinMilestone(currentUser.id, milestoneId);
+                    setProfile(updatedProfile);
+                    updateUser(updatedProfile);
+                  } catch (error) {
+                    console.error('Error unpinning milestone:', error);
+                    alert('Failed to unpin milestone');
+                  }
+                }
+              }}
+            />
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Achievements</p>
-                <p className="text-3xl font-bold text-foreground">{achievements.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
       {/* Achievements Grid */}
       <div>
@@ -544,6 +551,141 @@ export function Profile() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PinnedMilestonesSection({ 
+  userId, 
+  pinnedIds, 
+  isOwnProfile = false,
+  onUnpin 
+}: { 
+  userId: string; 
+  pinnedIds: string[]; 
+  isOwnProfile?: boolean;
+  onUnpin?: (milestoneId: string) => Promise<void>;
+}) {
+  const [milestones, setMilestones] = useState<MilestoneProgress[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadMilestones();
+  }, [userId, pinnedIds]);
+
+  const loadMilestones = async () => {
+    try {
+      setLoading(true);
+      const allMilestones = await getMilestoneProgress(userId);
+      // Filter to only show pinned milestones, but also include any pinned IDs that aren't in the current list
+      const milestoneMap = new Map(allMilestones.map(m => [m.id, m]));
+      const pinned: MilestoneProgress[] = [];
+      
+      // Add milestones that are in the current list
+      pinnedIds.forEach(id => {
+        const milestone = milestoneMap.get(id);
+        if (milestone) {
+          pinned.push(milestone);
+        } else {
+          // If milestone is pinned but not in current list (e.g., reset), create a placeholder
+          pinned.push({
+            id,
+            name: id.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+            description: 'This milestone is no longer active',
+            category: 'participation',
+            current: 0,
+            target: 1,
+            completed: false,
+          });
+        }
+      });
+      
+      setMilestones(pinned);
+    } catch (error) {
+      console.error('Error loading pinned milestones:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const milestoneIcons: Record<string, any> = {
+    new_explorer: Award,
+    regular_attendee: Award,
+    event_veteran: Award,
+    marathon_attendee: Award,
+    category_collector: Award,
+    long_term_member: Award,
+    verified_supporter: Award,
+    social_starter: Award,
+    community_builder: Award,
+    badge_collector: Award,
+    feedback_giver: Award,
+    top_reviewer: Award,
+    active_week: Award,
+    event_promoter: Award,
+  };
+
+  if (loading) {
+    return <div className="text-center py-4 text-muted-foreground">Loading milestones...</div>;
+  }
+
+  if (milestones.length === 0) {
+    return <div className="text-center py-4 text-muted-foreground">No pinned milestones yet.</div>;
+  }
+
+  return (
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {milestones.map((milestone) => {
+        const Icon = milestoneIcons[milestone.id] || Award;
+        return (
+          <div
+            key={milestone.id}
+            className={`p-4 rounded-lg border-2 ${
+              milestone.completed 
+                ? 'border-green-500 bg-green-50 dark:bg-green-900/20' 
+                : 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                milestone.completed 
+                  ? 'bg-green-100 dark:bg-green-900/40' 
+                  : 'bg-yellow-100 dark:bg-yellow-900/40'
+              }`}>
+                <Icon className={`w-5 h-5 ${milestone.completed ? 'text-green-600' : 'text-yellow-600'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                      {milestone.name}
+                    </h3>
+                    {!milestone.completed && (
+                      <Badge variant="secondary" className="text-xs">
+                        Incomplete
+                      </Badge>
+                    )}
+                  </div>
+                  {isOwnProfile && onUnpin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onUnpin(milestone.id)}
+                      className="h-6 px-2 text-xs"
+                      title="Unpin from profile"
+                    >
+                      <PinOff className="w-3 h-3 text-gray-400" />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+                  {milestone.description}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

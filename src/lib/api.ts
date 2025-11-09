@@ -2190,3 +2190,382 @@ export async function getBadgeTemplates(): Promise<BadgeTemplate[]> {
   }
 }
 
+// ========== MILESTONE TRACKING API ==========
+
+export interface MilestoneProgress {
+  id: string;
+  name: string;
+  description: string;
+  category: 'participation' | 'interaction';
+  current: number;
+  target: number;
+  completed: boolean;
+  icon?: string;
+}
+
+/**
+ * Get milestone progress for a user
+ */
+export async function getMilestoneProgress(userId: string): Promise<MilestoneProgress[]> {
+  const milestones: MilestoneProgress[] = [];
+
+  try {
+    // Parallelize independent queries for better performance
+    const [registrations, verifiedAchievements, friends] = await Promise.all([
+      getUserRegistrations(userId),
+      getAchievements({ userId, status: 'verified' }),
+      getMutualFollowers(userId),
+    ]);
+
+    const verifiedRegistrations = registrations.filter(r => r.verification_status === 'verified');
+    const eventsAttended = verifiedRegistrations.length;
+    
+    // Get unique event categories from achievements
+    const eventCategories = new Set<string>();
+    verifiedAchievements.forEach(a => {
+      if (a.category && a.event_id) {
+        eventCategories.add(a.category);
+      }
+    });
+    
+    // Get events attended in last week/month
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const eventsThisWeek = verifiedRegistrations.filter(r => {
+      const verifiedDate = r.verified_at ? new Date(r.verified_at) : null;
+      return verifiedDate && verifiedDate >= weekAgo;
+    }).length;
+    const eventsThisMonth = verifiedRegistrations.filter(r => {
+      const verifiedDate = r.verified_at ? new Date(r.verified_at) : null;
+      return verifiedDate && verifiedDate >= monthAgo;
+    }).length;
+    
+    // Get new organizers (organizers who created events the user attended)
+    const organizerIds = new Set<string>();
+    verifiedRegistrations.forEach(r => {
+      if (r.events?.organizer_id) {
+        organizerIds.add(r.events.organizer_id);
+      }
+    });
+    // For now, we'll count unique organizers - in a real system you'd track "new" organizers
+    const newOrganizersCount = organizerIds.size;
+    
+    // Get badges earned (reuse verifiedAchievements)
+    const badgesEarned = verifiedAchievements.filter(a => a.sui_object_id).length;
+    
+    // Get friends count
+    const friendsCount = friends.length;
+    
+    // Parallelize Supabase queries for likes and comments
+    let likesReceived = 0;
+    let reviewsGiven = 0;
+    
+    if (isSupabaseConfigured()) {
+      try {
+        // Get all user achievements for likes calculation
+        const allUserAchievements = await getAchievements({ userId });
+        const achievementIds = allUserAchievements.map(a => a.id);
+        
+        // Parallelize likes and comments queries
+        const [likesResult, commentsResult] = await Promise.all([
+          achievementIds.length > 0
+            ? supabase
+                .from('likes')
+                .select('id')
+                .in('achievement_id', achievementIds)
+                .catch(() => ({ data: null, error: null }))
+            : Promise.resolve({ data: [], error: null }),
+          supabase
+            .from('comments')
+            .select('id')
+            .eq('user_id', userId)
+            .catch(() => ({ data: null, error: null })),
+        ]);
+        
+        likesReceived = likesResult.data?.length || 0;
+        reviewsGiven = commentsResult.data?.length || 0;
+      } catch (e) {
+        console.warn('Error getting likes/reviews:', e);
+      }
+    }
+    
+    // Get likes on user's comments (reviews)
+    let reviewLikes = 0;
+    // This would require tracking likes on comments, which may not exist yet
+    // For now, we'll use a placeholder
+    
+    // Participation-Based Milestones
+    milestones.push({
+      id: 'new_explorer',
+      name: 'New Explorer',
+      description: 'Attend your first event',
+      category: 'participation',
+      current: eventsAttended,
+      target: 1,
+      completed: eventsAttended >= 1,
+    });
+    
+    milestones.push({
+      id: 'regular_attendee',
+      name: 'Regular Attendee',
+      description: 'Attend 5 events',
+      category: 'participation',
+      current: eventsAttended,
+      target: 5,
+      completed: eventsAttended >= 5,
+    });
+    
+    milestones.push({
+      id: 'event_veteran',
+      name: 'Event Veteran',
+      description: 'Attend 10 events',
+      category: 'participation',
+      current: eventsAttended,
+      target: 10,
+      completed: eventsAttended >= 10,
+    });
+    
+    milestones.push({
+      id: 'marathon_attendee',
+      name: 'Marathon Attendee',
+      description: 'Attend 3 events in a week/month',
+      category: 'participation',
+      current: Math.max(eventsThisWeek, eventsThisMonth),
+      target: 3,
+      completed: eventsThisWeek >= 3 || eventsThisMonth >= 3,
+    });
+    
+    milestones.push({
+      id: 'category_collector',
+      name: 'Category Collector',
+      description: 'Attend 5 different event types/categories',
+      category: 'participation',
+      current: eventCategories.size,
+      target: 5,
+      completed: eventCategories.size >= 5,
+    });
+    
+    milestones.push({
+      id: 'long_term_member',
+      name: 'Long-Term Member',
+      description: 'Attend 25+ events',
+      category: 'participation',
+      current: eventsAttended,
+      target: 25,
+      completed: eventsAttended >= 25,
+    });
+    
+    milestones.push({
+      id: 'verified_supporter',
+      name: 'Verified Supporter',
+      description: 'Attend 3 events hosted by new organizers',
+      category: 'participation',
+      current: Math.min(newOrganizersCount, 3),
+      target: 3,
+      completed: newOrganizersCount >= 3,
+    });
+    
+    // Interaction-Based Milestones
+    milestones.push({
+      id: 'social_starter',
+      name: 'Social Starter',
+      description: 'Invite 1 friend who signs up',
+      category: 'interaction',
+      current: friendsCount >= 1 ? 1 : 0,
+      target: 1,
+      completed: friendsCount >= 1,
+    });
+    
+    milestones.push({
+      id: 'community_builder',
+      name: 'Community Builder',
+      description: 'Invite 5+ users',
+      category: 'interaction',
+      current: friendsCount,
+      target: 5,
+      completed: friendsCount >= 5,
+    });
+    
+    milestones.push({
+      id: 'badge_collector',
+      name: 'Badge Collector',
+      description: 'Earn 5 NFT badges',
+      category: 'interaction',
+      current: badgesEarned,
+      target: 5,
+      completed: badgesEarned >= 5,
+    });
+    
+    milestones.push({
+      id: 'feedback_giver',
+      name: 'Feedback Giver',
+      description: 'Leave 3 verified reviews on attended events',
+      category: 'interaction',
+      current: reviewsGiven,
+      target: 3,
+      completed: reviewsGiven >= 3,
+    });
+    
+    milestones.push({
+      id: 'top_reviewer',
+      name: 'Top Reviewer',
+      description: 'Get 10 likes on your reviews',
+      category: 'interaction',
+      current: reviewLikes,
+      target: 10,
+      completed: reviewLikes >= 10,
+    });
+    
+    milestones.push({
+      id: 'active_week',
+      name: 'Active Week',
+      description: 'Log in and interact (like, comment, share) for 7 consecutive days',
+      category: 'interaction',
+      current: 0, // This would require login tracking
+      target: 7,
+      completed: false,
+    });
+    
+    milestones.push({
+      id: 'event_promoter',
+      name: 'Event Promoter',
+      description: 'Share 3 event links that get registrations',
+      category: 'interaction',
+      current: 0, // This would require share tracking
+      target: 3,
+      completed: false,
+    });
+    
+  } catch (error) {
+    console.error('Error calculating milestone progress:', error);
+  }
+  
+  return milestones;
+}
+
+/**
+ * Pin a milestone to user's profile
+ */
+export async function pinMilestone(userId: string, milestoneId: string): Promise<UserProfile> {
+  if (!isSupabaseConfigured()) {
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) throw new Error('User not found');
+    
+    const user = users[userIndex];
+    const pinned = user.pinned_milestones || [];
+    if (!pinned.includes(milestoneId)) {
+      users[userIndex] = { ...user, pinned_milestones: [...pinned, milestoneId] };
+      lsSet(LS_USERS, users);
+    }
+    return users[userIndex];
+  }
+  
+  try {
+    // Get current pinned milestones
+    const { data: currentUser, error: fetchError } = await supabase
+      .from('user_profiles')
+      .select('pinned_milestones')
+      .eq('id', userId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const pinned = (currentUser?.pinned_milestones || []) as string[];
+    if (pinned.includes(milestoneId)) {
+      // Already pinned, return current user
+      const { data: user } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      return user!;
+    }
+    
+    // Add milestone to pinned list
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({ 
+        pinned_milestones: [...pinned, milestoneId]
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      const userIndex = users.findIndex(u => u.id === userId);
+      if (userIndex === -1) throw new Error('User not found');
+      
+      const user = users[userIndex];
+      const pinned = user.pinned_milestones || [];
+      if (!pinned.includes(milestoneId)) {
+        users[userIndex] = { ...user, pinned_milestones: [...pinned, milestoneId] };
+        lsSet(LS_USERS, users);
+      }
+      return users[userIndex];
+    }
+    throw e;
+  }
+}
+
+/**
+ * Unpin a milestone from user's profile
+ */
+export async function unpinMilestone(userId: string, milestoneId: string): Promise<UserProfile> {
+  if (!isSupabaseConfigured()) {
+    const users = lsGet<UserProfile[]>(LS_USERS, []);
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) throw new Error('User not found');
+    
+    const user = users[userIndex];
+    const pinned = (user.pinned_milestones || []).filter(id => id !== milestoneId);
+    users[userIndex] = { ...user, pinned_milestones: pinned };
+    lsSet(LS_USERS, users);
+    return users[userIndex];
+  }
+  
+  try {
+    // Get current pinned milestones
+    const { data: currentUser, error: fetchError } = await supabase
+      .from('user_profiles')
+      .select('pinned_milestones')
+      .eq('id', userId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const pinned = ((currentUser?.pinned_milestones || []) as string[]).filter(id => id !== milestoneId);
+    
+    // Update pinned milestones
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update({ 
+        pinned_milestones: pinned
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  } catch (e: any) {
+    if (shouldMockOnError(e)) {
+      const users = lsGet<UserProfile[]>(LS_USERS, []);
+      const userIndex = users.findIndex(u => u.id === userId);
+      if (userIndex === -1) throw new Error('User not found');
+      
+      const user = users[userIndex];
+      const pinned = (user.pinned_milestones || []).filter(id => id !== milestoneId);
+      users[userIndex] = { ...user, pinned_milestones: pinned };
+      lsSet(LS_USERS, users);
+      return users[userIndex];
+    }
+    throw e;
+  }
+}
+

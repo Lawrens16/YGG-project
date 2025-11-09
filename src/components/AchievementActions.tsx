@@ -71,10 +71,10 @@ export function AchievementActions({ achievement, onUpdate }: AchievementActions
     try {
       console.log('Toggling like for achievement:', achievement.id, 'user:', user.id);
       await toggleReaction(achievement.id, user.id);
-      // Reload reactions to get updated state
+      // Reload reactions to get updated state (but don't reload entire feed)
       await new Promise(resolve => setTimeout(resolve, 200));
       await loadReactions();
-      if (onUpdate) onUpdate();
+      // Don't call onUpdate() - we don't need to reload the entire feed
     } catch (error) {
       console.error('Error toggling reaction:', error);
       alert(`Failed to like: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -95,7 +95,8 @@ export function AchievementActions({ achievement, onUpdate }: AchievementActions
       await addComment(achievement.id, user.id, submittingComment);
       await loadComments();
       await loadCommentCount();
-      if (onUpdate) onUpdate();
+      // Don't call onUpdate() - we don't need to reload the entire feed
+      // The comment is already added and displayed
     } catch (error: any) {
       console.error('Error adding comment:', error);
       setCommentText(submittingComment);

@@ -12,6 +12,7 @@ export interface UserProfile {
   is_organizer: boolean;
   is_admin: boolean;
   organizer_application_status: 'pending' | 'approved' | 'rejected' | null;
+  pinned_milestones?: string[] | null;
   created_at: string;
   updated_at: string;
 }
