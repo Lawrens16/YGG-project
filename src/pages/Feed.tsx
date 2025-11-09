@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getFeedAchievements, getAllEvents, getFollowing, getAchievements, createAchievement } from '@/lib/api';
+import { getFeedAchievements, getAllEvents, getFollowing, createAchievement, getFeaturedEvents } from '@/lib/api';
 import { FeedPost } from '@/components/FeedPost';
 import { CreatePost } from '@/components/CreatePost';
+import { FeaturedEventsHero } from '@/components/FeaturedEventsHero';
+import { EventQuickCard } from '@/components/EventQuickCard';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, UserPlus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -19,12 +21,42 @@ export function Feed() {
   const [hasFriends, setHasFriends] = useState(false);
   const [feedItems, setFeedItems] = useState<Array<{ type: 'achievement' | 'event'; data: Achievement | Event }>>([]);
   const [feedFilter, setFeedFilter] = useState<'all' | 'own'>('all');
+  const [featuredEvents, setFeaturedEvents] = useState<Event[]>([]);
+  const [ongoingEvents, setOngoingEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     if (user) {
       checkFriends();
     }
   }, [user]);
+
+  useEffect(() => {
+    async function loadFeatured() {
+      try {
+        // Get all featured events (they're already sorted by priority)
+        const featured = await getFeaturedEvents(20);
+        setFeaturedEvents(featured);
+      } catch (error) {
+        console.error('Error loading featured events:', error);
+      }
+    }
+    async function loadOngoing() {
+      try {
+        const allEvents = await getAllEvents({ limit: 100 });
+        const now = new Date();
+        const ongoing = allEvents.filter(event => {
+          const start = new Date(event.start_date);
+          const end = new Date(event.end_date);
+          return start <= now && end >= now;
+        });
+        setOngoingEvents(ongoing);
+      } catch (error) {
+        console.error('Error loading ongoing events:', error);
+      }
+    }
+    loadFeatured();
+    loadOngoing();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -51,18 +83,19 @@ export function Feed() {
     setLoading(true);
     try {
       let achievementsData: Achievement[] = [];
+      let eventsData: Event[] = [];
       
       if (feedFilter === 'own') {
-        // Load only user's own posts
-        achievementsData = await getAchievements({ userId: user.id });
+        // Load events
+        eventsData = await getAllEvents({ status: 'upcoming', limit: 5 });
       } else {
-        // Load feed from followed users
+        // Load feed from followed users, excluding current user's posts
         if (hasFriends) {
-          achievementsData = await getFeedAchievements(user.id);
+          const allFeedAchievements: Achievement[] = await getFeedAchievements(user.id);
+          // Filter out current user's posts
+          achievementsData = allFeedAchievements.filter((a) => a.user_id !== user.id);
         }
       }
-      
-      const eventsData = feedFilter === 'own' ? [] : await getAllEvents({ status: 'upcoming', limit: 5 });
       
       setAchievements(achievementsData as Achievement[]);
       setEvents(eventsData);
@@ -166,6 +199,33 @@ export function Feed() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+      {/* Featured Events Hero */}
+      {featuredEvents.length > 0 && (
+        <FeaturedEventsHero events={featuredEvents} />
+      )}
+
+      {/* Happening Now Section */}
+      {ongoingEvents.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="relative">
+              <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" />
+              <div className="relative w-2 h-2 bg-red-500 rounded-full" />
+            </div>
+            <h2 className="text-xl font-bold text-foreground">Happening Now</h2>
+          </div>
+          <div className="overflow-x-auto scrollbar-hide scroll-smooth snap-x snap-mandatory">
+            <div className="flex gap-4 pb-2">
+              {ongoingEvents.map(event => (
+                <div key={event.id} className="snap-start">
+                  <EventQuickCard event={event} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Post */}
       <CreatePost onSubmit={handleCreatePost} />
       
@@ -184,7 +244,7 @@ export function Feed() {
             onClick={() => setFeedFilter('own')}
             className="flex-1"
           >
-            My Posts
+            Events
           </Button>
         </div>
       </Card>
@@ -194,12 +254,12 @@ export function Feed() {
           <div className="max-w-md mx-auto">
             <UserPlus className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
             <p className="text-lg font-semibold text-foreground mb-2">
-              {feedFilter === 'own' ? 'No posts yet.' : 'No posts yet.'}
+              {feedFilter === 'own' ? 'No events yet.' : 'No posts yet.'}
             </p>
             <p className="text-sm text-muted-foreground">
               {feedFilter === 'own' 
-                ? 'Your posts will appear here!' 
-                : 'Posts from your friends will appear here!'}
+                ? 'Events will appear here!' 
+                : 'Posts from other users will appear here!'}
             </p>
           </div>
         </Card>

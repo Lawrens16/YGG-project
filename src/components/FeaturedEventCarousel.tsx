@@ -20,6 +20,8 @@ export function FeaturedEventCarousel({
   const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   // Calculate how many slides to show based on screen size
   const getSlidesToShow = () => {
@@ -80,6 +82,39 @@ export function FeaturedEventCarousel({
     setIsPaused(false);
   };
 
+  // Swipe gesture handlers
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+    setIsPaused(true);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) {
+      setIsPaused(false);
+      return;
+    }
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      nextSlide();
+    }
+    if (isRightSwipe) {
+      prevSlide();
+    }
+
+    setIsPaused(false);
+  };
+
   if (events.length === 0) {
     return null;
   }
@@ -97,6 +132,9 @@ export function FeaturedEventCarousel({
       className={`relative w-full ${className}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
       ref={containerRef}
       role="region"
       aria-label="Featured Events Carousel"
@@ -110,13 +148,13 @@ export function FeaturedEventCarousel({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
-            className="grid gap-4"
+            className="grid gap-4 items-stretch"
             style={{
               gridTemplateColumns: `repeat(${slidesToShow}, 1fr)`,
             }}
           >
             {currentEvents.map((event) => (
-              <FeaturedEventCard key={event.id} event={event} />
+              <FeaturedEventCard key={event.id} event={event} className="h-full" />
             ))}
             {/* Fill empty slots if needed */}
             {Array.from({ length: slidesToShow - currentEvents.length }).map((_, i) => (
@@ -124,15 +162,31 @@ export function FeaturedEventCarousel({
             ))}
           </motion.div>
         </AnimatePresence>
+        
+        {/* Progress Bar */}
+        {totalSlides > 1 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/10 dark:bg-white/10">
+            <motion.div
+              key={currentIndex}
+              className="h-full bg-gradient-to-r from-[#ff3800] to-[#ff6b35]"
+              initial={{ width: "0%" }}
+              animate={{ width: isPaused ? "0%" : "100%" }}
+              transition={{
+                duration: autoScrollInterval / 1000,
+                ease: "linear"
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Navigation Arrows */}
       {totalSlides > 1 && (
         <>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg rounded-full h-10 w-10"
+            className="absolute -left-4 md:-left-6 top-1/2 -translate-y-1/2 z-10 bg-background/40 hover:bg-background/70 backdrop-blur-sm border-0 shadow-md rounded-full h-9 w-9 opacity-60 hover:opacity-100 transition-opacity"
             onClick={prevSlide}
             aria-label="Previous slide"
             onKeyDown={(e) => {
@@ -142,12 +196,12 @@ export function FeaturedEventCarousel({
               }
             }}
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4 text-foreground" />
           </Button>
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white shadow-lg rounded-full h-10 w-10"
+            className="absolute -right-4 md:-right-6 top-1/2 -translate-y-1/2 z-10 bg-background/40 hover:bg-background/70 backdrop-blur-sm border-0 shadow-md rounded-full h-9 w-9 opacity-60 hover:opacity-100 transition-opacity"
             onClick={nextSlide}
             aria-label="Next slide"
             onKeyDown={(e) => {
@@ -157,7 +211,7 @@ export function FeaturedEventCarousel({
               }
             }}
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4 text-foreground" />
           </Button>
         </>
       )}
