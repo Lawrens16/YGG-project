@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useDisconnectWallet } from '@mysten/dapp-kit';
 import { Home, User, Award, LogOut, Calendar, Shield, Users, Search, X, Sun, Moon, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
@@ -12,7 +13,8 @@ import { InstallPrompt } from './InstallPrompt';
 import { OfflineIndicator } from './OfflineIndicator';
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, disconnect } = useAuth();
+  const { user, disconnect: disconnectAuth } = useAuth();
+  const { mutate: disconnectWallet } = useDisconnectWallet();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -169,7 +171,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       <Settings className="w-5 h-5" />
                     </Button>
                   </Link>
-                  <Button variant="ghost" size="icon" onClick={disconnect} title="Disconnect">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => {
+                      // Disconnect both auth context and dapp-kit wallet
+                      // Order matters: disconnect wallet first, then auth
+                      disconnectWallet();
+                      disconnectAuth();
+                      // Navigate to home after logout
+                      navigate('/');
+                    }} 
+                    title="Disconnect"
+                  >
                     <LogOut className="w-5 h-5" />
                   </Button>
                 </>

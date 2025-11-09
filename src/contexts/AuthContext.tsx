@@ -18,17 +18,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Check for stored wallet address
-    const stored = localStorage.getItem('wallet_address');
-    if (stored) {
-      loadUser(stored);
-    } else {
-      setLoading(false);
-    }
-  }, []);
+  // Removed auto-connect on mount - user must manually connect wallet
+  // This prevents auto-connecting when user logs out
 
   async function loadUser(address: string) {
     try {
@@ -67,6 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setWalletAddress(null);
     localStorage.removeItem('wallet_address');
+    // Note: dapp-kit wallet disconnection is handled in WalletConnect component
+    // This ensures both systems are disconnected when user logs out
   }
 
   async function updateUser(updates: Partial<UserProfile>) {

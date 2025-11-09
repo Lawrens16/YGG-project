@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrentAccount, useCurrentWallet } from '@mysten/dapp-kit';
 import {
   getPendingOrganizerApplications,
   approveOrganizer,
@@ -16,11 +17,140 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AchievementCard } from '@/components/AchievementCard';
-import { Check, X, Users, Calendar, Award, Star, Shield, Loader2 } from 'lucide-react';
+import { Check, X, Users, Calendar, Award, Star, Shield, Loader2, UserPlus } from 'lucide-react';
 
 interface EventFeaturedControlsProps {
   event: Event;
   onUpdate: () => void;
+}
+
+function ManualRegistrationForm({ onSuccess }: { onSuccess: () => void }) {
+  const [walletAddress, setWalletAddress] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const account = useCurrentAccount();
+  const { currentWallet } = useCurrentWallet();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!walletAddress.trim()) {
+      setError('Please enter a wallet address');
+      return;
+    }
+
+    // Basic validation for Sui address format
+    if (!walletAddress.startsWith('0x') || walletAddress.length < 10) {
+      setError('Invalid wallet address format. Should start with 0x');
+      return;
+    }
+
+    // Check if wallet is connected
+    if (!account) {
+      setError('Please connect your wallet first using the ConnectButton');
+      return;
+    }
+
+    setIsRegistering(true);
+    try {
+      // Try using dapp-kit's wallet if available, otherwise fallback to auto-detection
+      let result;
+      try {
+        // Pass the wallet from dapp-kit if available
+        // currentWallet is already the Wallet Standard wallet object
+        const wallet = currentWallet || null;
+        console.debug('[wallet] Using wallet from dapp-kit:', wallet ? { 
+          name: wallet.name, 
+          hasRequest: !!wallet.request,
+          hasFeatures: !!wallet.features,
+          features: wallet.features ? Object.keys(wallet.features) : undefined
+        } : 'none');
+        
+        if (!wallet) {
+          setError('Wallet not connected. Please connect your wallet using the ConnectButton at the top of the page.');
+          return;
+        }
+        
+        result = await registerOrganizer(walletAddress.trim(), wallet);
+      } catch (walletError: any) {
+        // If wallet detection fails, provide helpful error
+        if (walletError.message?.includes('wallet not found')) {
+          setError('Wallet not detected. Please make sure your Slush wallet is connected via the ConnectButton at the top of the page.');
+          return;
+        }
+        throw walletError;
+      }
+      
+      console.log('Manual registration successful:', result);
+      
+      if (result.created) {
+        alert(
+          `Organizer registered on-chain successfully!\n\n` +
+          `OrganizerCap Object ID: ${result.created}\n\n` +
+          `Transaction Digest: ${result.digest}\n\n` +
+          `Please save the OrganizerCap Object ID for reference.`
+        );
+      } else {
+        alert(
+          `Organizer registered on-chain successfully!\n\n` +
+          `Transaction Digest: ${result.digest}`
+        );
+      }
+      
+      setWalletAddress('');
+      onSuccess();
+    } catch (error: any) {
+      console.error('Manual registration failed:', error);
+      setError(error.message || 'Failed to register organizer. Make sure your wallet is connected.');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          type="text"
+          placeholder="0xOrganizerWalletAddress..."
+          value={walletAddress}
+          onChange={(e) => setWalletAddress(e.target.value)}
+          disabled={isRegistering}
+          className="flex-1 font-mono text-sm"
+        />
+        <Button
+          type="submit"
+          disabled={isRegistering || !walletAddress.trim()}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          {isRegistering ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Registering...
+            </>
+          ) : (
+            <>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Register On-Chain
+            </>
+          )}
+        </Button>
+      </div>
+      {error && (
+        <p className="text-sm text-red-600">{error}</p>
+      )}
+      {!account && (
+        <p className="text-xs text-yellow-600 font-medium">
+          ⚠️ Please connect your wallet using the ConnectButton at the top of the page first.
+        </p>
+      )}
+      <p className="text-xs text-gray-500">
+        This will register the organizer on-chain and create their OrganizerCap. 
+        Make sure your admin wallet is connected via the ConnectButton.
+      </p>
+    </form>
+  );
 }
 
 function EventFeaturedControls({ event, onUpdate }: EventFeaturedControlsProps) {
@@ -313,6 +443,15 @@ export function AdminPanel() {
 
       {activeTab === 'applications' && (
         <div className="space-y-4">
+          {/* Manual Registration Section */}
+          <Card className="p-4 border-2 border-dashed">
+            <h3 className="font-bold mb-3">Manual Organizer Registration</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Register an organizer on-chain directly by entering their wallet address.
+            </p>
+            <ManualRegistrationForm onSuccess={loadData} />
+          </Card>
+
           {pendingApplications.length === 0 ? (
             <Card className="p-8 text-center">
               <p className="text-gray-500">No pending applications</p>

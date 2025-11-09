@@ -128,6 +128,142 @@ function normalizeAccounts(res: any): string[] {
   return [];
 }
 
+/**
+ * Find a Sui-compatible wallet for transaction signing
+ * Uses the same detection logic as connectSlushWallet but returns the wallet object
+ * Also checks dapp-kit's wallet registry
+ */
+function findWalletForTransaction(): any {
+  const w = typeof window !== 'undefined' ? (window as any) : undefined;
+  if (!w) throw new Error('Window is not available');
+
+  // First, try to get wallet from dapp-kit's wallet registry
+  // dapp-kit stores wallets in window.__suiWallet__
+  try {
+    if (w.__suiWallet__) {
+      const walletRegistry = w.__suiWallet__;
+      // Try to get the current wallet
+      if (walletRegistry.getCurrentWallet) {
+        const current = walletRegistry.getCurrentWallet();
+        if (current && current.wallet) {
+          console.debug('[wallet] Found wallet from dapp-kit registry:', current.wallet.name);
+          return current.wallet;
+        }
+      }
+      // Try to get wallets array
+      if (walletRegistry.getWallets) {
+        const wallets = walletRegistry.getWallets();
+        if (wallets && wallets.length > 0 && wallets[0].wallet) {
+          console.debug('[wallet] Found wallet from dapp-kit wallets array:', wallets[0].wallet.name);
+          return wallets[0].wallet;
+        }
+      }
+    }
+  } catch (e) {
+    console.debug('[wallet] Could not access dapp-kit wallet registry:', e);
+  }
+
+  // Collect likely wallet providers on window (prioritize Slush)
+  const candidates = [
+    w.slush,
+    w.slushWallet,
+    w.suiWallet,
+    w.sui,
+    w.wallet,
+  ].filter(Boolean);
+
+  // Also check for Wallet Standard wallets array
+  if (w.wallets && Array.isArray(w.wallets)) {
+    candidates.push(...w.wallets);
+  }
+
+  // If none of the known keys exist, heuristically scan window for objects with request/connect
+  if (candidates.length === 0) {
+    const possibleKeys = Object.keys(w).filter((k) => {
+      try {
+        const v = w[k];
+        return v && typeof v === 'object' && (
+          typeof v.request === 'function' || 
+          typeof v.connect === 'function' || 
+          typeof v.getAccounts === 'function' ||
+          typeof v.signAndExecuteTransaction === 'function' ||
+          typeof v.signAndExecuteTransactionBlock === 'function'
+        );
+      } catch {
+        return false;
+      }
+    });
+    // Prioritize keys that hint at Sui/Slush
+    const prioritized = possibleKeys.sort((a, b) => {
+      const score = (s: string) => /slush|sui|wallet/i.test(s) ? 1 : 0;
+      return score(b) - score(a);
+    });
+    for (const k of prioritized) {
+      try {
+        const v = w[k];
+        candidates.push(v);
+      } catch {}
+    }
+  }
+
+  console.debug('[wallet] Transaction signing candidates:', candidates.map((c: any) => ({
+    hasRequest: !!c?.request,
+    hasSignAndExecuteTransactionBlock: !!c?.signAndExecuteTransactionBlock,
+    hasSignAndExecuteTransaction: !!c?.signAndExecuteTransaction,
+    name: c?.name || c?.provider?.name || c?.wallet?.name,
+    features: c?.features ? Object.keys(c.features) : undefined,
+  })));
+
+  // Check each candidate for transaction signing capability
+  for (const wallet of candidates) {
+    // Check for Wallet Standard interface (preferred)
+    if (wallet && typeof wallet.request === 'function') {
+      // Verify it has the sui_signAndExecuteTransactionBlock method
+      try {
+        // Check if it's a Wallet Standard wallet
+        if (wallet.features && wallet.features['sui:signAndExecuteTransactionBlock']) {
+          console.debug('[wallet] Found Wallet Standard wallet:', wallet.name || 'unknown');
+          return wallet;
+        }
+        // Or if it responds to the method (some wallets don't expose features)
+        // Try a test to see if it supports the method
+        console.debug('[wallet] Found wallet with request method:', wallet.name || 'unknown');
+        return wallet;
+      } catch {}
+    }
+    // Check for direct signAndExecuteTransactionBlock method
+    if (wallet && typeof wallet.signAndExecuteTransactionBlock === 'function') {
+      console.debug('[wallet] Found wallet with signAndExecuteTransactionBlock:', wallet.name || 'unknown');
+      return wallet;
+    }
+    // Check for Slush-style signAndExecuteTransaction
+    if (wallet && typeof wallet.signAndExecuteTransaction === 'function') {
+      console.debug('[wallet] Found wallet with signAndExecuteTransaction (Slush-style):', wallet.name || 'unknown');
+      return wallet;
+    }
+  }
+
+  // Provide helpful error message with debugging info (only log in development)
+  if (import.meta.env.DEV) {
+    const walletLikeKeys = Object.keys(w).filter(k => {
+      try {
+        const v = w[k];
+        return v && typeof v === 'object' && (
+          typeof v.request === 'function' || 
+          typeof v.connect === 'function' ||
+          /slush|sui|wallet/i.test(k)
+        );
+      } catch {
+        return false;
+      }
+    });
+    console.debug('[wallet] Wallet-like keys found:', walletLikeKeys);
+    console.debug('[wallet] dapp-kit registry:', w.__suiWallet__);
+  }
+  
+  throw new Error('Sui-compatible wallet not found. Please make sure your Slush wallet is connected via the ConnectButton and refresh the page.');
+}
+
 export async function signTransaction(txBytes: Uint8Array) {
   if (typeof window !== 'undefined' && (window as any).slush) {
     const wallet = (window as any).slush;
@@ -496,8 +632,13 @@ export async function batchMintClearances(
 /**
  * Register an organizer (admin function)
  * This should be called by the contract deployer/admin
+ * @param organizerAddress - The wallet address of the organizer to register
+ * @param wallet - Optional wallet object. If not provided, will try to detect wallet automatically
  */
-export async function registerOrganizer(organizerAddress: string): Promise<{ digest: string; created?: string }> {
+export async function registerOrganizer(
+  organizerAddress: string,
+  wallet?: any
+): Promise<{ digest: string; created?: string }> {
   const pkg = PACKAGE_ID;
   if (!pkg || pkg === '0x0') throw new Error('VITE_SUI_PACKAGE_ID is not set');
 
@@ -510,24 +651,58 @@ export async function registerOrganizer(organizerAddress: string): Promise<{ dig
     ],
   });
 
-  const wallet: any = (typeof window !== 'undefined') 
-    ? (window as any).suiWallet || (window as any).slush || (window as any).wallet 
-    : null;
+  // Use provided wallet or try to detect wallet
+  let walletToUse = wallet;
+  if (!walletToUse) {
+    try {
+      walletToUse = findWalletForTransaction();
+    } catch (error: any) {
+      // If wallet detection fails and no wallet was provided, throw a helpful error
+      throw new Error(
+        'Wallet not found. Please make sure your wallet is connected via the ConnectButton at the top of the page. ' +
+        'If the wallet is connected but you still see this error, try refreshing the page.'
+      );
+    }
+  }
   
-  if (!wallet || typeof wallet.request !== 'function') {
-    throw new Error('Sui-compatible wallet not found');
+  if (!walletToUse) {
+    throw new Error('No wallet available. Please connect your wallet first.');
   }
 
-  const res = await wallet.request({
-    method: 'sui_signAndExecuteTransactionBlock',
-    params: [{ 
-      transactionBlock: txb.serialize(), 
+  // Try Wallet Standard interface first
+  let res: any;
+  if (typeof walletToUse.request === 'function') {
+    try {
+      res = await walletToUse.request({
+        method: 'sui_signAndExecuteTransactionBlock',
+        params: [{ 
+          transactionBlock: txb.serialize(), 
+          options: { 
+            showEffects: true, 
+            showObjectChanges: true 
+          } 
+        }],
+      });
+    } catch (error: any) {
+      // If Wallet Standard fails, try alternative methods
+      console.warn('Wallet Standard method failed, trying alternatives:', error);
+      throw error;
+    }
+  } else if (typeof walletToUse.signAndExecuteTransactionBlock === 'function') {
+    // Direct method call
+    res = await walletToUse.signAndExecuteTransactionBlock({
+      transactionBlock: txb.serialize(),
       options: { 
         showEffects: true, 
         showObjectChanges: true 
-      } 
-    }],
-  });
+      }
+    });
+  } else if (typeof walletToUse.signAndExecuteTransaction === 'function') {
+    // Slush-style method
+    res = await walletToUse.signAndExecuteTransaction(txb.serialize());
+  } else {
+    throw new Error('Wallet does not support transaction signing');
+  }
 
   const digest: string = res?.digest || res?.effectsCert?.effects?.transactionDigest || res?.effects?.transactionDigest;
   let created: string | undefined;
