@@ -16,6 +16,7 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Split events: top 5 in hero, rest in bubbles
   const topEvents = events.slice(0, 5);
@@ -28,6 +29,17 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
       setIsCollapsed(JSON.parse(saved));
     }
   }, []);
+
+  // Auto-scroll through featured events
+  useEffect(() => {
+    if (topEvents.length <= 1 || isCollapsed || isPaused) return;
+
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % topEvents.length);
+    }, 4000); // Change every 4 seconds
+
+    return () => clearInterval(interval);
+  }, [topEvents.length, isCollapsed, isPaused]);
 
   // Save collapse state to localStorage
   const toggleCollapse = () => {
@@ -81,7 +93,7 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
   }
 
   return (
-    <div className="mb-6 relative z-0">
+    <div className="mb-6 relative z-0 w-full">
       {/* Header with toggle */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -102,10 +114,12 @@ export function FeaturedEventsHero({ events }: FeaturedEventsHeroProps) {
       {/* Hero Card - Only show if we have top events */}
       {topEvents.length > 0 && currentEvent && (
         <Card
-          className="relative overflow-hidden cursor-pointer group"
+          className="relative overflow-hidden cursor-pointer group w-full"
           onClick={() => navigate(`/events/${currentEvent.id}`)}
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}
         >
-        <div className="relative h-[300px] md:h-[350px] overflow-hidden rounded-lg">
+        <div className="relative h-[300px] md:h-[400px] lg:h-[450px] overflow-hidden rounded-lg">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentEvent.id}
